@@ -6,6 +6,15 @@ before:
     - go mod download
     # you may remove this if you don't need go generate
     - go generate ./...
+brews:
+  - github:
+      owner: sourcegraph
+      name: homebrew-ds-to-dhall
+    folder: Formula
+    homepage: https://github.com/sourcegraph/ds-to-dhall
+    description: CLI to translate deploy-sourcegraph YAML to Dhall
+    test: |
+      system "#{bin}/ds-to-dhall --help"
 builds:
   - env:
       - CGO_ENABLED=0
