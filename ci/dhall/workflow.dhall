@@ -18,5 +18,12 @@ in  GitHubActions.Workflow::{
     , name = "CI"
     , on = GitHubActions.On::{ push = Some GitHubActions.Push::{=} }
     , jobs = toMap
-        { shellcheck, shfmt, dhallFormat, dhallLint, checkPipeline, prettier, golangci-lint }
+        { shellcheck
+        , shfmt
+        , dhallFormat
+        , dhallLint
+        , checkPipeline
+        , prettier
+        , golangci-lint
+        }
     }
