@@ -145,6 +145,6 @@ ds-to-dhall -src ~/work/deploy-sourcegraph/base -dst ~/Desktop/record.dhall
 ```
 
 Component -> Kind -> Name. Usually if there is only one resource of that kind in a component this gets collapsed
-as Kind.Name. But we do have instance where there multiple Services or ConfigMaps or Deployments in one component, so
+as Kind.Name. But we do have cases where there multiple Services or ConfigMaps or Deployments in one component, so
 you will see a subrecord of the kind and then fields for each by Name.
 
