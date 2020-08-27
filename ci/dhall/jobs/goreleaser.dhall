@@ -16,7 +16,8 @@ in  Job::{
             , `if` = Some "startsWith(github.ref, 'refs/tags/')"
             , `with` = Some
                 (toMap { version = "latest", args = "release --rm-dist" })
-            , env = Some (toMap { GITHUB_TOKEN = "\${{ secrets.GITHUB_TOKEN }}" })
+            , env = Some
+                (toMap { GITHUB_TOKEN = "\${{ secrets.GITHUB_TOKEN }}" })
             }
           ]
     }
