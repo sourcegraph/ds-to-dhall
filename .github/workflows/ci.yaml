@@ -58,6 +58,25 @@ jobs:
         uses: 'golangci/golangci-lint-action@v1'
         with:
           version: v1.30
+  goreleaser:
+    name: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: 'actions/checkout@v2'
+      - name: Install asdf
+        uses: 'asdf-vm/actions/setup@v1.0.0'
+      - name: Install asdf plugins
+        run: './ci/asdf-add-plugins.sh'
+      - name: Install asdf tools versions
+        run: './ci/asdf-install.sh'
+      - env:
+          GITHUB_TOKEN: '${{ secrets.GH_TOKEN }}'
+        if: "startsWith(github.ref, 'refs/tags/')"
+        name: goreleaser
+        uses: 'goreleaser/goreleaser-action@v2'
+        with:
+          args: release --rm-dist
+          version: latest
   prettier:
     name: Prettier formatting
     runs-on: ubuntu-latest

@@ -14,6 +14,8 @@ let prettier = ./jobs/prettier.dhall
 
 let golangci-lint = ./jobs/golangci-lint.dhall
 
+let goreleaser = ./jobs/goreleaser.dhall
+
 in  GitHubActions.Workflow::{
     , name = "CI"
     , on = GitHubActions.On::{ push = Some GitHubActions.Push::{=} }
@@ -25,5 +27,6 @@ in  GitHubActions.Workflow::{
         , checkPipeline
         , prettier
         , golangci-lint
+        , goreleaser
         }
     }
