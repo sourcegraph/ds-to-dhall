@@ -44,7 +44,7 @@ jobs:
         name: Check that dhall files are linted properly
         run: scripts/lint.sh
   golangci-lint:
-    name: Prettier formatting
+    name: golangci-lint
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
@@ -54,8 +54,10 @@ jobs:
         run: './ci/asdf-add-plugins.sh'
       - name: Install asdf tools versions
         run: './ci/asdf-install.sh'
-      - name: Check Prettier formatting
-        run: ci/check-prettier.sh
+      - name: golangci-lint
+        uses: 'golangci/golangci-lint-action@v1'
+        with:
+          version: v1.33.0
   prettier:
     name: Prettier formatting
     runs-on: ubuntu-latest

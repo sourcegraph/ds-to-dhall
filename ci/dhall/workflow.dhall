@@ -12,7 +12,7 @@ let dhallLint = ./jobs/dhall-lint.dhall
 
 let prettier = ./jobs/prettier.dhall
 
-let golangci-lint = ./jobs/prettier.dhall
+let golangci-lint = ./jobs/golangci-lint.dhall
 
 in  GitHubActions.Workflow::{
     , name = "CI"
