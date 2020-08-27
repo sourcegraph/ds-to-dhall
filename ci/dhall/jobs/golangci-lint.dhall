@@ -13,7 +13,7 @@ in  Job::{
         # [ GitHubActions.Step::{
             , name = Some "golangci-lint"
             , uses = Some "golangci/golangci-lint-action@v1"
-            , `with` = Some (toMap { version = "v1.33.0" })
+            , `with` = Some (toMap { version = "v1.33" })
             }
           ]
     }

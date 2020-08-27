@@ -57,7 +57,7 @@ jobs:
       - name: golangci-lint
         uses: 'golangci/golangci-lint-action@v1'
         with:
-          version: v1.33.0
+          version: v1.33
   prettier:
     name: Prettier formatting
     runs-on: ubuntu-latest
