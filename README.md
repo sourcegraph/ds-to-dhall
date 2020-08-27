@@ -25,6 +25,9 @@ themselves. Component is currently deduced from the input directory structure (i
 ds-to-dhall -src ~/work/deploy-sourcegraph/base -dst ~/Desktop/record.dhall
 ```  
 
+> NOTE: ds-to-dhall relies on yaml-to-dhall being installed and available in $PATH. Look for 
+> the appropriate `dhall-yaml` package in https://github.com/dhall-lang/dhall-haskell/releases.
+
 ## Example schema snippet
 
 ```text
