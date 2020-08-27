@@ -12,20 +12,20 @@ manifests.
 The type of the produced Dhall expression is derived from the input directory tree of Kubernetes manifests.
 Resources from that input are organized by component, kind and name. Kind and name are directly pulled from the manifests
 themselves. Component is currently deduced from the input directory structure (ie resources inside the base/frontend
- subdirectory are assigned to the frontend component etc). This will later be improved by introducing labels in the
- manifests that directly declare components and thus eliminate the need to derive metadata from a directory structure 
- (which can be brittle and has exceptions that violate the location assumptions).
- 
- Resources are placed in the result record by component -> kind -> name and given the appropriate Dhall type from the
-  [Kubernetes Dhall schema](https://github.com/dhall-lang/dhall-kubernetes/blob/master/1.18/schemas.dhall).
+subdirectory are assigned to the frontend component etc). This will later be improved by introducing labels in the
+manifests that directly declare components and thus eliminate the need to derive metadata from a directory structure
+(which can be brittle and has exceptions that violate the location assumptions).
+
+Resources are placed in the result record by component -> kind -> name and given the appropriate Dhall type from the
+[Kubernetes Dhall schema](https://github.com/dhall-lang/dhall-kubernetes/blob/master/1.18/schemas.dhall).
 
 ## Usage
 
 ```shell script
 ds-to-dhall -src ~/work/deploy-sourcegraph/base -dst ~/Desktop/record.dhall
-```  
+```
 
-> NOTE: ds-to-dhall relies on yaml-to-dhall being installed and available in $PATH. Look for 
+> NOTE: ds-to-dhall relies on yaml-to-dhall being installed and available in \$PATH. Look for
 > the appropriate `dhall-yaml` package in https://github.com/dhall-lang/dhall-haskell/releases.
 
 ## Example schema snippet
@@ -84,13 +84,13 @@ ds-to-dhall -src ~/work/deploy-sourcegraph/base -dst ~/Desktop/record.dhall
 ```
 
 ## Example result snippet
- 
+
 ```text
 ...
  , Gitserver =
   {
-  ... 
-  
+  ...
+
   , StatefulSet.gitserver =
     { apiVersion = "apps/v1"
     , kind = "StatefulSet"
