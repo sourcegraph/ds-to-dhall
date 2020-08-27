@@ -2,8 +2,11 @@
 
 echo "--- shfmt (ensure shell-scripts are formatted consistently)"
 
-set -ex
+set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"/..
 
-shfmt -d .
+if ! shfmt -d .; then
+  echo "The scripts listed above aren't correctly formatted. Please run 'shfmt -w .' from the repository root and commit the result."
+  exit 1
+fi
