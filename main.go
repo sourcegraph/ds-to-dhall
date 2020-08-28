@@ -16,6 +16,47 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func main() {
+	src := flag.String("src", "", "(required) source manifest directory")
+	dst := flag.String("dst", "", "(required) output dhall file")
+
+	help := flag.Bool("help", false, "Show help")
+
+	flag.Parse()
+
+	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
+
+	if *help || len(*src) == 0 || len(*dst) == 0 {
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	log15.Info("loading resources", "src", *src)
+	srcSet, err := loadResourceSet(*src)
+	if err != nil {
+		log15.Error("failed to load source resources", "error", err, "src", *src)
+		os.Exit(1)
+	}
+
+	schema := composeDhallSchema(srcSet)
+
+	yamlBytes, err := buildYaml(buildRecord(srcSet))
+	if err != nil {
+		log15.Error("failed to compose yaml", "error", err)
+		os.Exit(1)
+	}
+
+	log15.Info("execute yaml-to-dhall", "dst", *dst)
+
+	err = execYamlToDhall(schema, yamlBytes, *dst)
+	if err != nil {
+		log15.Error("failed to execute yaml-to-dhall", "error", err, "schema", schema, "yaml", string(yamlBytes))
+		os.Exit(1)
+	}
+
+	log15.Info("done")
+}
+
 type Resource struct {
 	Source     string
 	Component  string
@@ -184,45 +225,4 @@ func execYamlToDhall(schema string, yamlBytes []byte, dst string) error {
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
-}
-
-func main() {
-	src := flag.String("src", "", "(required) source manifest directory")
-	dst := flag.String("dst", "", "(required) output dhall file")
-
-	help := flag.Bool("help", false, "Show help")
-
-	flag.Parse()
-
-	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
-
-	if *help || len(*src) == 0 || len(*dst) == 0 {
-		flag.PrintDefaults()
-		os.Exit(0)
-	}
-
-	log15.Info("loading resources", "src", *src)
-	srcSet, err := loadResourceSet(*src)
-	if err != nil {
-		log15.Error("failed to load source resources", "error", err, "src", *src)
-		os.Exit(1)
-	}
-
-	schema := composeDhallSchema(srcSet)
-
-	yamlBytes, err := buildYaml(buildRecord(srcSet))
-	if err != nil {
-		log15.Error("failed to compose yaml", "error", err)
-		os.Exit(1)
-	}
-
-	log15.Info("execute yaml-to-dhall", "dst", *dst)
-
-	err = execYamlToDhall(schema, yamlBytes, *dst)
-	if err != nil {
-		log15.Error("failed to execute yaml-to-dhall", "error", err, "schema", schema, "yaml", string(yamlBytes))
-		os.Exit(1)
-	}
-
-	log15.Info("done")
 }
