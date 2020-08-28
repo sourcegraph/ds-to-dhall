@@ -2,7 +2,7 @@
 
 ds-to-dhall is a (for now internal) tool that lets us keep up with changes in
 [deploy-sourcegraph](https://github.com/sourcegraph/deploy-sourcegraph) and friends while we are designing, engineering
-and eventually migrating to a deploymemnt solution based on [Dhall](https://dhall-lang.org/#).
+and eventually migrating to a deployment solution based on [Dhall](https://dhall-lang.org/#).
 
 ## Intro
 
