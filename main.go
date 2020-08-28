@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"flag"
+
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,7 +14,64 @@ import (
 
 	"github.com/inconshreveable/log15"
 	"gopkg.in/yaml.v3"
+
+	flag "github.com/spf13/pflag"
 )
+
+var sourceDirectory string
+var destinationFile string
+var timeout time.Duration
+
+func init() {
+	flag.StringVarP(&sourceDirectory, "source", "s", "", "source manifest directory")
+	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
+	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+}
+
+func main() {
+	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
+
+	flag.Parse()
+
+	if destinationFile == "" {
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	if sourceDirectory == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			logFatal("failed to get cwd for sourceDirectory", "err", err)
+		}
+
+		sourceDirectory = cwd
+	}
+
+	log15.Info("loading resources", "src", sourceDirectory)
+	srcSet, err := loadResourceSet(sourceDirectory)
+	if err != nil {
+		logFatal("failed to load source resources", "error", err, "src", sourceDirectory)
+	}
+
+	schema := composeDhallSchema(srcSet)
+
+	yamlBytes, err := buildYaml(buildRecord(srcSet))
+	if err != nil {
+		logFatal("failed to compose yaml", "error", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	log15.Info("execute yaml-to-dhall", "destination", destinationFile)
+
+	err = yamlToDhall(ctx, schema, yamlBytes, destinationFile)
+	if err != nil {
+		logFatal("failed to execute yaml-to-dhall", "error", err, "schema", schema, "yaml", string(yamlBytes))
+	}
+
+	log15.Info("done")
+}
 
 type Resource struct {
 	Source     string
@@ -139,46 +196,48 @@ func loadResourceSet(dirname string) (*ResourceSet, error) {
 func composeDhallSchema(rs *ResourceSet) string {
 	var schemas []string
 
-	for component, crs := range rs.Components {
-		for _, res := range crs {
-			s := fmt.Sprintf("{%s: { %s: { %s: %s } } }", strings.Title(component), res.Kind, res.Name, res.DhallType)
+	for component, resources := range rs.Components {
+		for _, r := range resources {
+			s := fmt.Sprintf("{ %s : { %s : { %s : %s } } }", strings.Title(component), r.Kind, r.Name, r.DhallType)
 			schemas = append(schemas, s)
 		}
 	}
+
 	return strings.Join(schemas, " ⩓ ")
 }
 
 func buildRecord(rs *ResourceSet) map[string]interface{} {
-	rec := make(map[string]interface{})
-	for component, crs := range rs.Components {
+	record := make(map[string]interface{})
+
+	for component, resources := range rs.Components {
 		compRec := make(map[string]map[string]interface{})
-		rec[strings.Title(component)] = compRec
-		for _, res := range crs {
-			kindRec := compRec[res.Kind]
+		record[strings.Title(component)] = compRec
+		for _, r := range resources {
+			kindRec := compRec[r.Kind]
 			if kindRec == nil {
 				kindRec = make(map[string]interface{})
-				compRec[res.Kind] = kindRec
+				compRec[r.Kind] = kindRec
 			}
-			kindRec[res.Name] = res.Contents
+			kindRec[r.Name] = r.Contents
 		}
 	}
-	return rec
+
+	return record
 }
 
-func buildYaml(rec map[string]interface{}) ([]byte, error) {
+func buildYaml(dhallRecord map[string]interface{}) ([]byte, error) {
 	var b bytes.Buffer
-	enc := yaml.NewEncoder(&b)
-	err := enc.Encode(rec)
+	e := yaml.NewEncoder(&b)
+
+	err := e.Encode(dhallRecord)
 	if err != nil {
 		return nil, err
 	}
+
 	return b.Bytes(), nil
 }
 
-func execYamlToDhall(schema string, yamlBytes []byte, dst string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-	defer cancel()
-
+func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst string) error {
 	cmd := exec.CommandContext(ctx, "yaml-to-dhall", schema, "--records-loose", "--output", dst)
 	cmd.Stdin = bytes.NewReader(yamlBytes)
 	cmd.Stderr = os.Stderr
@@ -186,43 +245,7 @@ func execYamlToDhall(schema string, yamlBytes []byte, dst string) error {
 	return cmd.Run()
 }
 
-func main() {
-	src := flag.String("src", "", "(required) source manifest directory")
-	dst := flag.String("dst", "", "(required) output dhall file")
-
-	help := flag.Bool("help", false, "Show help")
-
-	flag.Parse()
-
-	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
-
-	if *help || len(*src) == 0 || len(*dst) == 0 {
-		flag.PrintDefaults()
-		os.Exit(0)
-	}
-
-	log15.Info("loading resources", "src", *src)
-	srcSet, err := loadResourceSet(*src)
-	if err != nil {
-		log15.Error("failed to load source resources", "error", err, "src", *src)
-		os.Exit(1)
-	}
-
-	schema := composeDhallSchema(srcSet)
-
-	yamlBytes, err := buildYaml(buildRecord(srcSet))
-	if err != nil {
-		log15.Error("failed to compose yaml", "error", err)
-		os.Exit(1)
-	}
-
-	log15.Info("execute yaml-to-dhall", "dst", *dst)
-
-	err = execYamlToDhall(schema, yamlBytes, *dst)
-	if err != nil {
-		log15.Error("failed to execute yaml-to-dhall", "error", err, "schema", schema, "yaml", string(yamlBytes))
-		os.Exit(1)
-	}
-
-	log15.Info("done")
+func logFatal(message string, ctx ...interface{}) {
+	log15.Error(message, ctx...)
+	os.Exit(1)
 }
