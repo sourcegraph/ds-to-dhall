@@ -13,6 +13,11 @@ let ASDFSteps =
         , name = Some "Install asdf tools versions"
         , run = Some "./ci/asdf-install.sh"
         }
+      , GitHubActions.Step::{
+        , name = Some "setup go"
+        , uses = Some "actions/setup-go@v1"
+        , `with` = Some (toMap { go-version = "1.15" })
+        }
       ]
 
 let Checkout =
