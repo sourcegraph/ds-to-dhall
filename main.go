@@ -18,26 +18,31 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-var flags *flag.FlagSet
 var sourceDirectory string
 var destinationFile string
 var timeout time.Duration
 
-func init() {
-	flags = flag.NewFlagSet("ds-to-dhall", flag.ExitOnError)
+var printHelp bool
 
-	flags.StringVarP(&sourceDirectory, "source", "s", "", "source manifest directory")
-	flags.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
-	flags.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+func init() {
+	flag.StringVarP(&sourceDirectory, "source", "s", "", "source manifest directory")
+	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
+	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall:\n")
+		flag.PrintDefaults()
+	}
 }
 
 func main() {
 	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
 
-	err := flags.Parse(os.Args)
+	flag.Parse()
 
-	if err == flag.ErrHelp {
-		flags.Usage()
+	if printHelp {
+		flag.Usage()
 		os.Exit(0)
 	}
 
