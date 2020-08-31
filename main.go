@@ -18,20 +18,28 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+var flags *flag.FlagSet
 var sourceDirectory string
 var destinationFile string
 var timeout time.Duration
 
 func init() {
-	flag.StringVarP(&sourceDirectory, "source", "s", "", "source manifest directory")
-	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
-	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+	flags = flag.NewFlagSet("ds-to-dhall", flag.ExitOnError)
+
+	flags.StringVarP(&sourceDirectory, "source", "s", "", "source manifest directory")
+	flags.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
+	flags.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 }
 
 func main() {
 	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
 
-	flag.Parse()
+	err := flags.Parse(os.Args)
+
+	if err == flag.ErrHelp {
+		flags.Usage()
+		os.Exit(0)
+	}
 
 	if destinationFile == "" {
 		flag.PrintDefaults()
