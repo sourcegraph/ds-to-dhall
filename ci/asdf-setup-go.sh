@@ -3,7 +3,7 @@
 cd "$(dirname "${BASH_SOURCE[0]}")"/..
 set -euxo pipefail
 
-ASDF_GOLANG_DIRECTORY="$(asdf where golang)"
+ASDF_GOLANG_DIRECTORY="$(asdf where golang)/go"
 
 # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
 echo "::set-env name=GOROOT::${ASDF_GOLANG_DIRECTORY}"
