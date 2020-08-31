@@ -18,7 +18,7 @@ let publish
     : GitHubActions.Step.Type
     =   base
       ⫽ { `if` = Some isTag
-        , name = Some "build go binaries for release"
+        , name = Some "[goreleaser]: build binaries for release"
         , `with` = Some
             (toMap { version = "latest", args = "release --rm-dist" })
         , env = Some (toMap { GITHUB_TOKEN = "\${{ secrets.GH_TOKEN }}" })
@@ -28,7 +28,7 @@ let test_publish
     : GitHubActions.Step.Type
     =   base
       ⫽ { `if` = Some "! ${isTag}"
-        , name = Some "test building go binaries"
+        , name = Some "[goreleaser]: test building go binaries"
         , `with` = Some
             ( toMap
                 { version = "latest"
