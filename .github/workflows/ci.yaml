@@ -5,16 +5,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - name: Check that the CI pipeline definition is up-to-date with the dhall configuration
         run: ci/check-rendered-pipeline-up-to-date.sh
   dhallFormat:
@@ -22,16 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - env:
           CHECK: 'true'
         name: Check that dhall files are formatted
@@ -41,16 +37,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - env:
           CHECK: 'true'
         name: Check that dhall files are linted properly
@@ -60,16 +54,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - name: golangci-lint
         uses: 'golangci/golangci-lint-action@v1'
         with:
@@ -79,16 +71,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - env:
           GITHUB_TOKEN: '${{ secrets.GH_TOKEN }}'
         if: "startsWith(github.ref, 'refs/tags/')"
@@ -102,16 +92,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - name: Check Prettier formatting
         run: ci/check-prettier.sh
   shellcheck:
@@ -119,16 +107,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - name: Lint shell scripts
         run: ci/shellcheck.sh
   shfmt:
@@ -136,16 +122,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: 'actions/checkout@v2'
-      - name: Install asdf
+      - name: '[setup] Install asdf'
         uses: 'asdf-vm/actions/setup@v1.0.0'
-      - name: Install asdf plugins
+      - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
-      - name: Install asdf tools versions
+      - name: '[setup] Install asdf .tool-versions'
         run: './ci/asdf-install.sh'
-      - name: setup go
-        uses: 'actions/setup-go@v1'
-        with:
-          go-version: '1.15'
+      - name: '[setup] prepare go environment'
+        uses: './ci/asdf-setup-go.sh'
       - name: Check that scripts are formatted consistently
         run: ci/shfmt.sh
 name: CI
