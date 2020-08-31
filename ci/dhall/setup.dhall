@@ -21,7 +21,7 @@ let ASDFSteps =
         }
       , GitHubActions.Step::{
         , name = Some "[setup] prepare go environment"
-        , uses = Some "./ci/asdf-setup-go.sh"
+        , run = Some "./ci/asdf-setup-go.sh"
         }
       ]
 
