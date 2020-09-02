@@ -21,6 +21,7 @@ import (
 var destinationFile string
 var typeFile string
 var timeout time.Duration
+var useK8sSchema bool
 
 var printHelp bool
 
@@ -28,6 +29,7 @@ func init() {
 	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
 	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flag.Usage = func() {
@@ -66,12 +68,15 @@ func main() {
 		logFatal("failed to load source resources", "error", err, "inputs", inputs)
 	}
 
-	dhallType := composeDhallType(srcSet)
+	dhallType := ""
+	if useK8sSchema {
+		dhallType = composeDhallType(srcSet)
 
-	if typeFile != "" {
-		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0777)
-		if err != nil {
-			logFatal("failed to write dhall type", "error", err, "typeFile", typeFile)
+		if typeFile != "" {
+			err = ioutil.WriteFile(typeFile, []byte(dhallType), 0777)
+			if err != nil {
+				logFatal("failed to write dhall type", "error", err, "typeFile", typeFile)
+			}
 		}
 	}
 
@@ -87,7 +92,8 @@ func main() {
 
 	err = yamlToDhall(ctx, dhallType, yamlBytes, destinationFile)
 	if err != nil {
-		logFatal("failed to execute yaml-to-dhall", "error", err, "dhallType", dhallType, "yaml", string(yamlBytes))
+		_ = ioutil.WriteFile("record.yaml", yamlBytes, 0777)
+		logFatal("failed to execute yaml-to-dhall", "error", err, "dhallType", dhallType, "yaml", "record.yaml")
 	}
 
 	log15.Info("done")
@@ -311,7 +317,12 @@ func buildYaml(dhallRecord map[string]interface{}) ([]byte, error) {
 }
 
 func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst string) error {
-	cmd := exec.CommandContext(ctx, "yaml-to-dhall", schema, "--records-loose", "--output", dst)
+	var cmd *exec.Cmd
+	if schema == "" {
+		cmd = exec.CommandContext(ctx, "yaml-to-dhall", "--records-loose", "--output", dst)
+	} else {
+		cmd = exec.CommandContext(ctx, "yaml-to-dhall", schema, "--records-loose", "--output", dst)
+	}
 	cmd.Stdin = bytes.NewReader(yamlBytes)
 	cmd.Stderr = os.Stderr
 
