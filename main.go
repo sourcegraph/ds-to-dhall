@@ -172,7 +172,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 
 	componentLabel, ok := labels["sourcegraph-component"].(string)
 	if ok {
-		res.Component= componentLabel
+		res.Component = componentLabel
 	} else {
 		log15.Warn("deriving component from directory", "manifest", filename)
 		res.Component = filepath.Dir(relPath)
@@ -308,6 +308,58 @@ func hasKeyWithStringValue(rec map[string]interface{}, key string) bool {
 	return ok
 }
 
+func str2dockerImage(dstr string) map[string]interface{} {
+	// example: index.docker.io/sourcegraph/frontend:3.19.2@sha256:776606b680d7ce4a5d37451831ef2414ab10414b5e945ed5f50fe768f898d23fa
+	// parts: registry: index.docker.io
+	//        name: sourcegraph/frontend
+	//        version: 3.19.2
+	//        sha256: 776606b680d7ce4a5d37451831ef2414ab10414b5e945ed5f50fe768f898d23fa
+
+	di := make(map[string]interface{})
+	xs := strings.Split(dstr, "@sha256:")
+
+	if len(xs) == 2 {
+		di["sha256"] = xs[1]
+		dstr = xs[0]
+	}
+
+	xs = strings.Split(dstr, ":")
+	if len(xs) == 2 {
+		di["version"] = xs[1]
+		dstr = xs[0]
+	}
+
+	xs = strings.Split(dstr, "/")
+	if len(xs) > 1 {
+		di["registry"] = xs[0]
+		di["name"] = strings.Join(xs[1:], "/")
+	} else {
+		di["name"] = dstr
+	}
+
+	return di
+}
+
+func transformDockerImageSpec(rec map[string]interface{}) map[string]interface{} {
+	mrec := make(map[string]interface{})
+	for k, v := range rec {
+		mrec[k] = v
+		dstr, ok := v.(string)
+
+		if k == "image" && ok {
+			mrec[k] = str2dockerImage(dstr)
+		}
+
+		rv, ok := mrec[k].(map[string]interface{})
+		if ok {
+			xrec := transformDockerImageSpec(rv)
+			mrec[k] = xrec
+		}
+	}
+
+	return mrec
+}
+
 func transformList2Record(rec map[string]interface{}) (map[string]interface{}, error) {
 	mrec := make(map[string]interface{})
 
@@ -318,7 +370,7 @@ func transformList2Record(rec map[string]interface{}) (map[string]interface{}, e
 		lv, ok := v.([]interface{})
 		if ok && len(lv) > 0 {
 			xrec, ok := lv[0].(map[string]interface{})
-			if ok && hasKeyWithStringValue(xrec,"name") {
+			if ok && hasKeyWithStringValue(xrec, "name") {
 				rv := make(map[string]interface{})
 				for _, x := range lv {
 					xrec, ok = x.(map[string]interface{})
@@ -350,19 +402,13 @@ func strengthenRecord(rec map[string]interface{}) map[string]interface{} {
 		return rec
 	}
 
-	// only transformation currently: if it recognizes a list with elements that are records with a name key
-	// it transforms the list into a record with each list element a field under its respective name
-
-	// planned transformations:
-	// - break docker image specs into a record of image spec parts (registry, name, version, sha256) so they can be
-	//   easily manipulated in dhall
-	// - ... (more transformation will reveal themselves as we work through the PoC assignment
-
+	// more transformation will reveal themselves as we work through the PoC assignment
 	srec, err := transformList2Record(rec)
 	if err != nil {
 		log15.Warn("failed to strengthen record, returning original", "record", rec, "err", err)
 		return rec
 	}
+	srec = transformDockerImageSpec(srec)
 	return srec
 }
 
