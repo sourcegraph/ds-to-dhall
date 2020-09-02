@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,15 +18,15 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-var sourceDirectory string
 var destinationFile string
+var typeFile string
 var timeout time.Duration
 
 var printHelp bool
 
 func init() {
-	flag.StringVarP(&sourceDirectory, "source", "s", "", "source manifest directory")
 	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
+	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
@@ -50,22 +51,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	if sourceDirectory == "" {
+	inputs := flag.Args()
+	if len(inputs) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
 			logFatal("failed to get cwd for sourceDirectory", "err", err)
 		}
-
-		sourceDirectory = cwd
+		inputs = []string{cwd}
 	}
 
-	log15.Info("loading resources", "src", sourceDirectory)
-	srcSet, err := loadResourceSet(sourceDirectory)
+	log15.Info("loading resources", "inputs", inputs)
+	srcSet, err := loadResourceSet(inputs)
 	if err != nil {
-		logFatal("failed to load source resources", "error", err, "src", sourceDirectory)
+		logFatal("failed to load source resources", "error", err, "inputs", inputs)
 	}
 
-	schema := composeDhallSchema(srcSet)
+	dhallType := composeDhallType(srcSet)
+
+	if typeFile != "" {
+		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0777)
+		if err != nil {
+			logFatal("failed to write dhall type", "error", err, "typeFile", typeFile)
+		}
+	}
 
 	yamlBytes, err := buildYaml(buildRecord(srcSet))
 	if err != nil {
@@ -77,9 +85,9 @@ func main() {
 
 	log15.Info("execute yaml-to-dhall", "destination", destinationFile)
 
-	err = yamlToDhall(ctx, schema, yamlBytes, destinationFile)
+	err = yamlToDhall(ctx, dhallType, yamlBytes, destinationFile)
 	if err != nil {
-		logFatal("failed to execute yaml-to-dhall", "error", err, "schema", schema, "yaml", string(yamlBytes))
+		logFatal("failed to execute yaml-to-dhall", "error", err, "dhallType", dhallType, "yaml", string(yamlBytes))
 	}
 
 	log15.Info("done")
@@ -186,40 +194,79 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	return &res, err
 }
 
-func loadResourceSet(dirname string) (*ResourceSet, error) {
-	dir, err := filepath.Abs(dirname)
+func makeAbs(paths []string) ([]string, error) {
+	var pas []string
+
+	for _, path := range paths {
+		pa, err := filepath.Abs(path)
+		if err != nil {
+			return nil, err
+		}
+		pas = append(pas, pa)
+	}
+	return pas, nil
+}
+
+func commonPrefix(paths []string) (string, error) {
+	if len(paths) == 0 {
+		return "", nil
+	}
+
+	cp := strings.Split(paths[0], string(os.PathSeparator))
+
+	for _, path := range paths[1:] {
+		ps := strings.Split(path, string(os.PathSeparator))
+		cp = cp[:len(ps)]
+
+		idx := 0
+		for idx < len(cp) && cp[idx] == ps[idx] {
+			idx++
+		}
+		cp = cp[:idx]
+	}
+	return strings.Join(cp, string(os.PathSeparator)), nil
+}
+
+func loadResourceSet(inputs []string) (*ResourceSet, error) {
+	pas, err := makeAbs(inputs)
+	if err != nil {
+		return nil, err
+	}
+	cr, err := commonPrefix(pas)
 	if err != nil {
 		return nil, err
 	}
 	var rs ResourceSet
 	rs.Components = make(map[string][]*Resource)
-	rs.Root = dir
+	rs.Root = cr
 
-	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-
-		if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
-			res, err := loadResource(rs.Root, path)
+	for _, input := range pas {
+		err = filepath.Walk(input, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			rs.Components[res.Component] = append(rs.Components[res.Component], res)
+			if info.IsDir() {
+				return nil
+			}
+
+			if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
+				res, err := loadResource(rs.Root, path)
+				if err != nil {
+					return err
+				}
+				rs.Components[res.Component] = append(rs.Components[res.Component], res)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return &rs, nil
 }
 
-func composeDhallSchema(rs *ResourceSet) string {
+func composeDhallType(rs *ResourceSet) string {
 	var schemas []string
 
 	for component, resources := range rs.Components {
