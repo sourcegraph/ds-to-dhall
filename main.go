@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-
 	"fmt"
 	"os"
 	"os/exec"
@@ -118,12 +117,10 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 
 	var res Resource
 	res.Source = filename
-	// TODO(uwedeportivo): derive it from metadata labels instead once those labels become available
-	res.Component = filepath.Dir(relPath)
-	if res.Component == "." {
-		res.Component = filepath.Base(rootDir)
-	}
 	err = decoder.Decode(&res.Contents)
+	if err != nil {
+		return nil, err
+	}
 
 	kind, ok := res.Contents["kind"].(string)
 	if !ok {
@@ -146,24 +143,40 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 
 	name, ok := metadata["name"].(string)
 	if !ok {
-		return nil, fmt.Errorf("resource %s is missing name", filename)
+		return nil, fmt.Errorf("resource %s is missing name field", filename)
 	}
 	res.Name = name
+
+	labels, ok := metadata["labels"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("resource %s is missing labels section", filename)
+	}
+
+	componentLabel, ok := labels["sourcegraph-component"].(string)
+	if ok {
+		res.Component= componentLabel
+	} else {
+		log15.Warn("deriving component from directory", "manifest", filename)
+		res.Component = filepath.Dir(relPath)
+		if res.Component == "." {
+			res.Component = filepath.Base(rootDir)
+		}
+	}
 
 	// patch statefulsets
 	if res.Kind == "StatefulSet" {
 		spec, ok := res.Contents["spec"].(map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf("resource %s is missing spec", filename)
+			return nil, fmt.Errorf("resource %s is missing spec section", filename)
 		}
 		volumeClaimTemplates, ok := spec["volumeClaimTemplates"].([]interface{})
 		if !ok {
-			return nil, fmt.Errorf("resource %s is missing volumeClaimTemplates", filename)
+			return nil, fmt.Errorf("resource %s is missing volumeClaimTemplates section", filename)
 		}
 		for _, volumeClaimTemplate := range volumeClaimTemplates {
 			vct, ok := volumeClaimTemplate.(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf("resource %s is missing volumeClaimTemplate", filename)
+				return nil, fmt.Errorf("resource %s is missing volumeClaimTemplate section", filename)
 			}
 			vct["apiVersion"] = "apps/v1"
 			vct["kind"] = "PersistentVolumeClaim"
