@@ -22,6 +22,7 @@ var destinationFile string
 var typeFile string
 var timeout time.Duration
 var useK8sSchema bool
+var ignoreFiles []string
 
 var printHelp bool
 
@@ -30,6 +31,7 @@ func init() {
 	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
+	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flag.Usage = func() {
@@ -163,7 +165,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 
 	labels, ok := metadata["labels"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("resource %s is missing labels section", filename)
+		labels = make(map[string]interface{})
 	}
 
 	componentLabel, ok := labels["sourcegraph-component"].(string)
@@ -256,6 +258,15 @@ func loadResourceSet(inputs []string) (*ResourceSet, error) {
 			}
 
 			if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
+				for _, ignorePattern := range ignoreFiles {
+					ignore, err := filepath.Match(ignorePattern, filepath.Base(path))
+					if err != nil {
+						return err
+					}
+					if ignore {
+						return nil
+					}
+				}
 				res, err := loadResource(rs.Root, path)
 				if err != nil {
 					return err
