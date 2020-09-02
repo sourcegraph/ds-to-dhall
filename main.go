@@ -23,15 +23,17 @@ var typeFile string
 var timeout time.Duration
 var useK8sSchema bool
 var ignoreFiles []string
+var strengthen bool
 
 var printHelp bool
 
 func init() {
 	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
-	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
+	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file. ignored if useK8sSchema is not set")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
+	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records). ignored if useK8sSchema is set")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flag.Usage = func() {
@@ -296,6 +298,74 @@ func composeDhallType(rs *ResourceSet) string {
 	return strings.Join(schemas, " ⩓ ")
 }
 
+func hasKeyWithStringValue(rec map[string]interface{}, key string) bool {
+	v, ok := rec[key]
+	if !ok {
+		return false
+	}
+
+	_, ok = v.(string)
+	return ok
+}
+
+func transformList2Record(rec map[string]interface{}) (map[string]interface{}, error) {
+	mrec := make(map[string]interface{})
+
+	for k, v := range rec {
+		mrec[k] = v
+
+		// check if it's a list with records in it that have "name" key
+		lv, ok := v.([]interface{})
+		if ok && len(lv) > 0 {
+			xrec, ok := lv[0].(map[string]interface{})
+			if ok && hasKeyWithStringValue(xrec,"name") {
+				rv := make(map[string]interface{})
+				for _, x := range lv {
+					xrec, ok = x.(map[string]interface{})
+					if !ok || !hasKeyWithStringValue(xrec, "name") {
+						return nil, fmt.Errorf("expected list of records that have `name` key %+v", lv)
+					}
+					name := xrec["name"].(string)
+					rv[name] = xrec
+				}
+				mrec[k] = rv
+			}
+		}
+
+		// do the recursive transform
+		rv, ok := mrec[k].(map[string]interface{})
+		if ok {
+			xrec, err := transformList2Record(rv)
+			if err != nil {
+				return nil, err
+			}
+			mrec[k] = xrec
+		}
+	}
+	return mrec, nil
+}
+
+func strengthenRecord(rec map[string]interface{}) map[string]interface{} {
+	if !strengthen || useK8sSchema {
+		return rec
+	}
+
+	// only transformation currently: if it recognizes a list with elements that are records with a name key
+	// it transforms the list into a record with each list element a field under its respective name
+
+	// planned transformations:
+	// - break docker image specs into a record of image spec parts (registry, name, version, sha256) so they can be
+	//   easily manipulated in dhall
+	// - ... (more transformation will reveal themselves as we work through the PoC assignment
+
+	srec, err := transformList2Record(rec)
+	if err != nil {
+		log15.Warn("failed to strengthen record, returning original", "record", rec, "err", err)
+		return rec
+	}
+	return srec
+}
+
 func buildRecord(rs *ResourceSet) map[string]interface{} {
 	record := make(map[string]interface{})
 
@@ -308,7 +378,7 @@ func buildRecord(rs *ResourceSet) map[string]interface{} {
 				kindRec = make(map[string]interface{})
 				compRec[r.Kind] = kindRec
 			}
-			kindRec[r.Name] = r.Contents
+			kindRec[r.Name] = strengthenRecord(r.Contents)
 		}
 	}
 
