@@ -221,15 +221,24 @@ func commonPrefix(paths []string) (string, error) {
 
 	cp := strings.Split(paths[0], string(os.PathSeparator))
 
+	if len(cp) == 0 || (len(cp) == 1 && cp[0] == "") {
+		return "/", nil
+	}
+
 	for _, path := range paths[1:] {
 		ps := strings.Split(path, string(os.PathSeparator))
-		cp = cp[:len(ps)]
+		if len(cp) > len(ps) {
+			cp = cp[:len(ps)]
+		}
 
 		idx := 0
 		for idx < len(cp) && cp[idx] == ps[idx] {
 			idx++
 		}
 		cp = cp[:idx]
+	}
+	if len(cp) == 0 || (len(cp) == 1 && cp[0] == "") {
+		return "/", nil
 	}
 	return strings.Join(cp, string(os.PathSeparator)), nil
 }
