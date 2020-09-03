@@ -152,9 +152,9 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 		return nil, fmt.Errorf("resource %s is missing labels section", filename)
 	}
 
-	componentLabel, ok := labels["sourcegraph-component"].(string)
+	componentLabel, ok := labels["app.kubernetes.io/component"].(string)
 	if ok {
-		res.Component= componentLabel
+		res.Component = componentLabel
 	} else {
 		log15.Warn("deriving component from directory", "manifest", filename)
 		res.Component = filepath.Dir(relPath)
