@@ -236,6 +236,42 @@ func commonPrefix(paths []string) (string, error) {
 	return strings.Join(cp, string(os.PathSeparator)), nil
 }
 
+// implements a primitive suffix match using filepath.Match
+// note: these are not the same semantics as .gitignore
+func matchIgnore(pattern, path string) (bool, error) {
+	if len(path) == 0 {
+		return false, nil
+	}
+	sep := string(os.PathSeparator)
+	parts := strings.Split(path, sep)
+
+	for idx := len(parts) - 1; idx >= 0; idx-- {
+		p := strings.Join(parts[idx:], sep)
+
+		ignore, err := filepath.Match(pattern, p)
+		if err != nil {
+			return false, err
+		}
+		if ignore {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func ignorePath(path string) (bool, error) {
+	for _, ignorePattern := range ignoreFiles {
+		ignore, err := matchIgnore(ignorePattern, path)
+		if err != nil {
+			return false, err
+		}
+		if ignore {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func loadResourceSet(inputs []string) (*ResourceSet, error) {
 	pas, err := makeAbs(inputs)
 	if err != nil {
@@ -254,20 +290,22 @@ func loadResourceSet(inputs []string) (*ResourceSet, error) {
 			if err != nil {
 				return err
 			}
+
+			ignore, err := ignorePath(path)
+			if err != nil {
+				return err
+			}
+			if ignore && info.IsDir() {
+				return filepath.SkipDir
+			}
+			if ignore {
+				return nil
+			}
 			if info.IsDir() {
 				return nil
 			}
 
 			if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
-				for _, ignorePattern := range ignoreFiles {
-					ignore, err := filepath.Match(ignorePattern, filepath.Base(path))
-					if err != nil {
-						return err
-					}
-					if ignore {
-						return nil
-					}
-				}
 				res, err := loadResource(rs.Root, path)
 				if err != nil {
 					return err
