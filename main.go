@@ -149,7 +149,8 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 
 	labels, ok := metadata["labels"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("resource %s is missing labels section", filename)
+		// manifests without labels section exist
+		labels = make(map[string]interface{})
 	}
 
 	componentLabel, ok := labels["app.kubernetes.io/component"].(string)
