@@ -31,7 +31,7 @@ func (rt *RecordType) ToDhall(sb *strings.Builder, indentLevel int) {
 
 type FieldType struct {
 	K string     `(@Ident | @QuotedLabel) ":"` //nolint
-	V *ValueType `@@`
+	V *ValueType `@@`                          //nolint
 }
 
 func (ft *FieldType) ToDhall(sb *strings.Builder, indentLevel int) {
