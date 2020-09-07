@@ -10,7 +10,7 @@ import (
 )
 
 type RecordType struct {
-	Fields []*FieldType `"{" (@@ ("," @@)* )? "}"`
+	Fields []*FieldType `"{" (@@ ("," @@)* )? "}"` //nolint
 }
 
 func (rt *RecordType) ToDhall(sb *strings.Builder, indentLevel int) {
@@ -30,7 +30,7 @@ func (rt *RecordType) ToDhall(sb *strings.Builder, indentLevel int) {
 }
 
 type FieldType struct {
-	K string     `(@Ident | @QuotedLabel) ":"`
+	K string     `(@Ident | @QuotedLabel) ":"` //nolint
 	V *ValueType `@@`
 }
 
@@ -42,7 +42,7 @@ func (ft *FieldType) ToDhall(sb *strings.Builder, indentLevel int) {
 }
 
 type UnionType struct {
-	Members []*ValueType `"<" (@@ ("|" @@)* )? ">"`
+	Members []*ValueType `"<" (@@ ("|" @@)* )? ">"` //nolint
 }
 
 func (ut *UnionType) ToDhall(sb *strings.Builder, indentLevel int) {
@@ -60,8 +60,8 @@ func (ut *UnionType) ToDhall(sb *strings.Builder, indentLevel int) {
 }
 
 type LastValueType struct {
-	R *RecordType `@@ `
-	U *UnionType  `| @@`
+	R *RecordType `@@ `  //nolint
+	U *UnionType  `| @@` //nolint
 }
 
 func (lt *LastValueType) ToDhall(sb *strings.Builder, indentLevel int) {
@@ -73,8 +73,8 @@ func (lt *LastValueType) ToDhall(sb *strings.Builder, indentLevel int) {
 }
 
 type ValueType struct {
-	S []string       ` @(Ident)*`
-	L *LastValueType ` ( @@ )?`
+	S []string       ` @(Ident)*` //nolint
+	L *LastValueType ` ( @@ )?`   //nolint
 }
 
 func (vt *ValueType) ToDhall(sb *strings.Builder, indentLevel int) {
