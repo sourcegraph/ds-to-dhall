@@ -194,7 +194,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	res.Source = filename
 	err = decoder.Decode(&res.Contents)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode yaml file: %s: %v", filename, err)
 	}
 
 	kind, ok := res.Contents["kind"].(string)
@@ -409,12 +409,16 @@ func composeSimplifiedDhallType(yamlBytes []byte) (string, error) {
 
 	dhallTypeBytes, err := dhallRecordToType(ctx, yamlBytes)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to derive dhall type from record: %v", err)
+	}
+
+	if !strengthen {
+		return string(dhallTypeBytes), nil
 	}
 
 	rt, err := parseRecordType(bytes.NewReader(dhallTypeBytes))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse dhall type: %v", err)
 	}
 
 	transformRecordType(rt)
