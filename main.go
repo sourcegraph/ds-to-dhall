@@ -17,15 +17,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var destinationFile string
-var typeFile string
-var schemaFile string
-var timeout time.Duration
-var useK8sSchema bool
-var ignoreFiles []string
-var strengthen bool
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
 
-var printHelp bool
+var (
+	destinationFile string
+	typeFile        string
+	schemaFile      string
+	timeout         time.Duration
+	useK8sSchema    bool
+	ignoreFiles     []string
+	strengthen      bool
+
+	printHelp    bool
+	printVersion bool
+)
 
 func init() {
 	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
@@ -36,6 +45,7 @@ func init() {
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
 	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records). ignored if useK8sSchema is set")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
+	flag.BoolVar(&printVersion, "version", false, "print version information")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall:\n")
@@ -50,6 +60,12 @@ func main() {
 
 	if printHelp {
 		flag.Usage()
+		os.Exit(0)
+	}
+
+	if printVersion {
+		output := versionString(version, commit, date)
+		fmt.Fprintln(os.Stderr, output)
 		os.Exit(0)
 	}
 
@@ -152,6 +168,14 @@ type ResourceSet struct {
 	Components map[string][]*Resource
 }
 
+func versionString(version, commit, date string) string {
+	return strings.Join([]string{
+		fmt.Sprintf("version: %s", version),
+		fmt.Sprintf("commit: %s", commit),
+		fmt.Sprintf("build date: %s", date),
+	}, "\n")
+}
+
 func loadResource(rootDir string, filename string) (*Resource, error) {
 	relPath, err := filepath.Rel(rootDir, filename)
 	if err != nil {
@@ -170,7 +194,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	res.Source = filename
 	err = decoder.Decode(&res.Contents)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode yaml file: %s: %v", filename, err)
 	}
 
 	kind, ok := res.Contents["kind"].(string)
@@ -385,12 +409,16 @@ func composeSimplifiedDhallType(yamlBytes []byte) (string, error) {
 
 	dhallTypeBytes, err := dhallRecordToType(ctx, yamlBytes)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to derive dhall type from record: %v", err)
+	}
+
+	if !strengthen {
+		return string(dhallTypeBytes), nil
 	}
 
 	rt, err := parseRecordType(bytes.NewReader(dhallTypeBytes))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse dhall type: %v", err)
 	}
 
 	transformRecordType(rt)
