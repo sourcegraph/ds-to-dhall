@@ -19,6 +19,7 @@ import (
 
 var destinationFile string
 var typeFile string
+var schemaFile string
 var timeout time.Duration
 var useK8sSchema bool
 var ignoreFiles []string
@@ -28,7 +29,8 @@ var printHelp bool
 
 func init() {
 	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
-	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file. ignored if useK8sSchema is not set")
+	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
+	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
@@ -81,7 +83,6 @@ func main() {
 	dhallType := ""
 	if useK8sSchema {
 		dhallType = composeK8sDhallType(srcSet)
-
 	} else {
 		dhallTypeStr, err := composeSimplifiedDhallType(yamlBytes)
 		if err != nil {
@@ -90,9 +91,13 @@ func main() {
 		dhallType = dhallTypeStr
 	}
 	if typeFile != "" {
-		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0777)
+		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0644)
 		if err != nil {
 			logFatal("failed to write dhall type", "error", err, "typeFile", typeFile)
+		}
+		err = dhallFormat(typeFile)
+		if err != nil {
+			logFatal("failed to format dhall file", "error", err, "file", typeFile)
 		}
 	}
 
@@ -101,8 +106,31 @@ func main() {
 
 	err = yamlToDhall(ctx, dhallType, yamlBytes, destinationFile)
 	if err != nil {
-		_ = ioutil.WriteFile("record.yaml", yamlBytes, 0777)
+		_ = ioutil.WriteFile("record.yaml", yamlBytes, 0644)
 		logFatal("failed to execute yaml-to-dhall", "error", err, "dhallType", dhallType, "yaml", "record.yaml")
+	}
+
+	err = dhallFormat(destinationFile)
+	if err != nil {
+		logFatal("failed to format dhall file", "error", err, "file", destinationFile)
+	}
+
+	if schemaFile != "" {
+		recordContents, err := ioutil.ReadFile(destinationFile)
+		if err != nil {
+			logFatal("failed to read record contents", "error", err, "destinationFile", destinationFile)
+		}
+		schemaContents := fmt.Sprintf("{ Type = %s, default = %s }", dhallType, string(recordContents))
+
+		err = ioutil.WriteFile(schemaFile, []byte(schemaContents), 0644)
+		if err != nil {
+			logFatal("failed to write schema file", "error", err, "schemaFile", schemaFile)
+		}
+
+		err = dhallFormat(schemaFile)
+		if err != nil {
+			logFatal("failed to format dhall file", "error", err, "file", schemaFile)
+		}
 	}
 
 	log15.Info("done")
@@ -462,7 +490,12 @@ func dhallRecordToType(ctx context.Context, yamlBytes []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
 
+func dhallFormat(file string) error {
+	cmd := exec.Command("dhall", "format", "--inplace", file)
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func logFatal(message string, ctx ...interface{}) {
