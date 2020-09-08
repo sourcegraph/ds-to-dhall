@@ -51,12 +51,9 @@
                                     , SRC_GIT_SERVERS :
                                         { name : Text, value : Text }
                                     }
-                                , image :
-                                    { name : Text
-                                    , registry : Text
-                                    , sha256 : Text
-                                    , version : Text
-                                    }
+                                , image : < asText : Text
+                                             | asRecord : { name : Text, registry : Text, sha256 : Text, version : Text }
+                                          >
                                 , livenessProbe :
                                     { httpGet :
                                         { path : Text

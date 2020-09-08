@@ -42,20 +42,22 @@ func (ft *FieldType) ToDhall(sb *strings.Builder, indentLevel int) {
 }
 
 type UnionType struct {
-	Members []*ValueType `"<" (@@ ("|" @@)* )? ">"` //nolint
+	Members []*FieldType `"<" (@@ ("|" @@)* )? ">"` //nolint
 }
 
 func (ut *UnionType) ToDhall(sb *strings.Builder, indentLevel int) {
-	sb.WriteString("<")
+	sb.WriteString("<\n")
 	first := true
 	for _, member := range ut.Members {
+		sb.WriteString(strings.Repeat("\t", indentLevel))
 		if first {
 			first = false
 		} else {
-			sb.WriteString("|")
+			sb.WriteString(" | ")
 		}
 		member.ToDhall(sb, indentLevel)
 	}
+	sb.WriteString(strings.Repeat("\t", indentLevel-1))
 	sb.WriteString(">")
 }
 
@@ -131,10 +133,29 @@ func improvedContainerResourcesType() *RecordType {
 	return icrt
 }
 
+const dockerImageType = `
+{ image :
+    < asText : Text
+    | asRecord : { name : Text, registry : Text, sha256 : Text, version : Text }
+    >
+}
+`
+
+func improvedDockerImageType() *RecordType {
+	bf := bytes.NewReader([]byte(dockerImageType))
+
+	icrt, _ := parseRecordType(bf)
+	return icrt
+}
+
 func transformRecordType(rt *RecordType) {
 	for _, field := range rt.Fields {
 		if (field.K == "limits" || field.K == "requests") && field.V.L != nil && field.V.L.R != nil {
 			field.V.L.R = improvedContainerResourcesType()
+		} else if field.K == "image" && field.V.L != nil && field.V.L.R != nil {
+			idr := improvedDockerImageType()
+			field.V.L.U = idr.Fields[0].V.L.U
+			field.V.L.R = nil
 		} else if field.V.L != nil && field.V.L.R != nil {
 			transformRecordType(field.V.L.R)
 		}
