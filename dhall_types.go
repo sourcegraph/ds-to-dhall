@@ -80,17 +80,37 @@ type ValueType struct {
 }
 
 func (vt *ValueType) ToDhall(sb *strings.Builder, indentLevel int) {
-	sb.WriteString(strings.Join(vt.S, " "))
+	n := len(vt.S)
+	if vt.L != nil {
+		n = n + 1
+	}
+
+	numOpenBraces := 0
+	if n <= 2 {
+		sb.WriteString(strings.Join(vt.S, " "))
+	} else {
+		sb.WriteString(vt.S[0])
+
+		for _, st := range vt.S[1:] {
+			sb.WriteString(" ( ")
+			numOpenBraces++
+			sb.WriteString(st)
+		}
+	}
+
 	if vt.L != nil {
 		if len(vt.S) > 0 {
 			sb.WriteString(" ")
 		}
 		vt.L.ToDhall(sb, indentLevel+1)
 	}
+
+	sb.WriteString(strings.Repeat(" )", numOpenBraces))
 }
 
 const lexerSpec = `
 whitespace = \s+
+roundBraces = [()]
 Ident = [a-zA-Z][a-zA-Z_\-\d]*
 QuotedLabel = ¬.+¬
 Punct = [:{}<>,|]
