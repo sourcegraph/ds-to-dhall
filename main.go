@@ -557,11 +557,13 @@ func buildComponents(rs *ResourceSet) map[string]interface{} {
 				kindRec = make(map[string]interface{})
 				compRec[r.Kind] = kindRec
 			}
+			km := make(map[string]interface{})
+			kindRec[r.Name] = km
 			if r.Kind == "Deployment" || r.Kind == "StatefulSet" || r.Kind == "DaemonSet" {
 				containers := make(map[string]interface{})
 				found := extractContainersMap(strengthenRecord(r.Contents), containers)
 				if found {
-					kindRec[r.Name] = containers
+					km["containers"] = containers
 				}
 			}
 		}
