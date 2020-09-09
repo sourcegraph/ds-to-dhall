@@ -27,6 +27,7 @@ var (
 	destinationFile string
 	typeFile        string
 	schemaFile      string
+	componentsFile  string
 	timeout         time.Duration
 	useK8sSchema    bool
 	ignoreFiles     []string
@@ -40,6 +41,7 @@ func init() {
 	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
 	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
+	flag.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
@@ -146,6 +148,18 @@ func main() {
 		err = dhallFormat(schemaFile)
 		if err != nil {
 			logFatal("failed to format dhall file", "error", err, "file", schemaFile)
+		}
+	}
+
+	if componentsFile != "" {
+		componentsBytes, err := buildYaml(buildComponents(srcSet))
+		if err != nil {
+			logFatal("failed to build components yaml", "error", err)
+		}
+
+		err = ioutil.WriteFile(componentsFile, componentsBytes, 0644)
+		if err != nil {
+			logFatal("failed to write components file", "error", err, "componentsFile", componentsFile)
 		}
 	}
 
@@ -464,11 +478,11 @@ func buildRecord(rs *ResourceSet) map[string]interface{} {
 	return record
 }
 
-func buildYaml(dhallRecord map[string]interface{}) ([]byte, error) {
+func buildYaml(record map[string]interface{}) ([]byte, error) {
 	var b bytes.Buffer
 	e := yaml.NewEncoder(&b)
 
-	err := e.Encode(dhallRecord)
+	err := e.Encode(record)
 	if err != nil {
 		return nil, err
 	}
@@ -529,4 +543,51 @@ func dhallFormat(file string) error {
 func logFatal(message string, ctx ...interface{}) {
 	log15.Error(message, ctx...)
 	os.Exit(1)
+}
+
+func buildComponents(rs *ResourceSet) map[string]interface{} {
+	record := make(map[string]interface{})
+
+	for component, resources := range rs.Components {
+		compRec := make(map[string]map[string]interface{})
+		record[strings.Title(component)] = compRec
+		for _, r := range resources {
+			kindRec := compRec[r.Kind]
+			if kindRec == nil {
+				kindRec = make(map[string]interface{})
+				compRec[r.Kind] = kindRec
+			}
+			if r.Kind == "Deployment" || r.Kind == "StatefulSet" || r.Kind == "DaemonSet" {
+				containers := make(map[string]interface{})
+				found := extractContainersMap(strengthenRecord(r.Contents), containers)
+				if found {
+					kindRec[r.Name] = containers
+				}
+			}
+		}
+	}
+
+	return record
+}
+
+func extractContainersMap(contents, containers map[string]interface{}) bool {
+	for k, v := range contents {
+		cm, ok := v.(map[string]interface{})
+
+		if k == "containers" && ok {
+			for ck, _ := range cm {
+				containers[ck] = struct{}{}
+			}
+			return true
+		}
+
+		if ok {
+			found := extractContainersMap(cm, containers)
+			if found {
+				return true
+			}
+		}
+	}
+
+	return false
 }
