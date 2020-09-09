@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/inconshreveable/log15"
@@ -37,7 +38,7 @@ var (
 )
 
 func init() {
-	flag.StringVarP(&destinationFile, "destination", "d", "", "(required) dhall output file")
+	flag.StringVarP(&destinationFile, "output", "o", "", "(required) dhall output file")
 	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
@@ -48,8 +49,10 @@ func init() {
 	flag.BoolVar(&printVersion, "version", false, "print version information")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall:\n")
+		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall: --output <output> <path>...\n")
+		fmt.Fprintln(os.Stderr, "OPTIONS:")
 		flag.PrintDefaults()
+		fmt.Fprintln(os.Stderr, usageArgs())
 	}
 }
 
@@ -70,7 +73,7 @@ func main() {
 	}
 
 	if destinationFile == "" {
-		flag.PrintDefaults()
+		flag.Usage()
 		os.Exit(1)
 	}
 
@@ -169,11 +172,17 @@ type ResourceSet struct {
 }
 
 func versionString(version, commit, date string) string {
-	return strings.Join([]string{
-		fmt.Sprintf("version: %s", version),
-		fmt.Sprintf("commit: %s", commit),
-		fmt.Sprintf("build date: %s", date),
-	}, "\n")
+	b := bytes.Buffer{}
+	w := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
+
+	fmt.Fprintf(w, "version:\t%s", version)
+	fmt.Fprintln(w, "")
+	fmt.Fprintf(w, "commit:\t%s", commit)
+	fmt.Fprintln(w, "")
+	fmt.Fprintf(w, "build date:\t%s", date)
+	w.Flush()
+
+	return b.String()
 }
 
 func loadResource(rootDir string, filename string) (*Resource, error) {
@@ -260,6 +269,17 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	}
 
 	return &res, err
+}
+
+func usageArgs() string {
+	b := bytes.Buffer{}
+	w := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
+
+	fmt.Fprintln(w, "\t<path>\t(required) list of Kubernetes YAML files (or directories containing them) to process")
+	fmt.Fprintln(w, "\t<output>\t(required) dhall output file")
+	w.Flush()
+
+	return fmt.Sprintf("ARGS:\n%s", b.String())
 }
 
 func makeAbs(paths []string) ([]string, error) {
