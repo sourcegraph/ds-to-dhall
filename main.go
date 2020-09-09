@@ -275,7 +275,7 @@ func usageArgs() string {
 	b := bytes.Buffer{}
 	w := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
 
-	fmt.Fprintln(w, "\t<path>\tlist of Kubernetes YAML files (or directories containing them) to process")
+	fmt.Fprintln(w, "\t<path>\t(required) list of Kubernetes YAML files (or directories containing them) to process")
 	fmt.Fprintln(w, "\t<output>\t(required) dhall output file")
 	w.Flush()
 
