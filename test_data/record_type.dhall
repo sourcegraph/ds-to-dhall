@@ -316,7 +316,8 @@
                 }
             , spec :
                 { clusterIP : Text
-                , ports : List (Optional { port : Natural, targetPort : Natural })
+                , ports :
+                    List (Optional { port : Natural, targetPort : Natural })
                 , selector : { app : Text }
                 , type : Text
                 }
