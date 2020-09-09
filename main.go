@@ -577,7 +577,7 @@ func extractContainersMap(contents, containers map[string]interface{}) bool {
 		cm, ok := v.(map[string]interface{})
 
 		if k == "containers" && ok {
-			for ck, _ := range cm {
+			for ck := range cm {
 				containers[ck] = struct{}{}
 			}
 			return true
