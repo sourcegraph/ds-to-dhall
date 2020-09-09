@@ -52,11 +52,14 @@
                                         { name : Text, value : Text }
                                     }
                                 , image :
-                                    { name : Text
-                                    , registry : Text
-                                    , sha256 : Text
-                                    , version : Text
-                                    }
+                                    < asText : Text
+                                    | asRecord :
+                                        { name : Text
+                                        , registry : Text
+                                        , sha256 : Text
+                                        , version : Text
+                                        }
+                                    >
                                 , livenessProbe :
                                     { httpGet :
                                         { path : Text
@@ -313,7 +316,8 @@
                 }
             , spec :
                 { clusterIP : Text
-                , ports : List { port : Natural, targetPort : Natural }
+                , ports :
+                    List (Optional { port : Natural, targetPort : Natural })
                 , selector : { app : Text }
                 , type : Text
                 }
