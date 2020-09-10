@@ -176,6 +176,23 @@ func transformRecordType(rt *RecordType) {
 			idr := improvedDockerImageType()
 			field.V.L.U = idr.Fields[0].V.L.U
 			field.V.L.R = nil
+		} else if field.K == "metadata" && field.V.L.R != nil {
+			alreadyPresent := false
+			for _, f := range field.V.L.R.Fields {
+				if f.K == "namespace" {
+					alreadyPresent = true
+				}
+			}
+			if !alreadyPresent {
+				namespaceValue := &ValueType{
+					S: []string{"Optional", "Text"},
+				}
+				namespaceField := &FieldType{
+					K: "namespace",
+					V: namespaceValue,
+				}
+				field.V.L.R.Fields = append(field.V.L.R.Fields, namespaceField)
+			}
 		} else if field.V.L != nil && field.V.L.R != nil {
 			transformRecordType(field.V.L.R)
 		}
