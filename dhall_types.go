@@ -168,7 +168,17 @@ func improvedDockerImageType() *RecordType {
 	return icrt
 }
 
+const additionalEnvVarsTypeDhall = `{ additionalEnv : Optional (List { name : Text, value : Text })}`
+
+func additionalEnvVarsType() *RecordType {
+	bf := bytes.NewReader([]byte(additionalEnvVarsTypeDhall))
+
+	t, _ := parseRecordType(bf)
+	return t
+}
+
 func transformRecordType(rt *RecordType) {
+	addAdditionalEnvVars := false
 	for _, field := range rt.Fields {
 		if (field.K == "limits" || field.K == "requests") && field.V.L != nil && field.V.L.R != nil {
 			field.V.L.R = improvedContainerResourcesType()
@@ -193,8 +203,20 @@ func transformRecordType(rt *RecordType) {
 				}
 				field.V.L.R.Fields = append(field.V.L.R.Fields, namespaceField)
 			}
+		} else if field.K == "env" && field.V.L.R != nil {
+			for _, env := range field.V.L.R.Fields {
+				if len(env.V.S) == 0 {
+					env.V.S = []string{"Optional"}
+				}
+			}
+			addAdditionalEnvVars = true
 		} else if field.V.L != nil && field.V.L.R != nil {
 			transformRecordType(field.V.L.R)
 		}
+	}
+
+	if addAdditionalEnvVars {
+		t := additionalEnvVarsType()
+		rt.Fields = append(rt.Fields, t.Fields[0])
 	}
 }
