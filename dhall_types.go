@@ -186,6 +186,7 @@ func transformRecordType(rt *RecordType) {
 			idr := improvedDockerImageType()
 			field.V.L.U = idr.Fields[0].V.L.U
 			field.V.L.R = nil
+			addAdditionalEnvVars = true
 		} else if field.K == "metadata" && field.V.L.R != nil {
 			alreadyPresent := false
 			for _, f := range field.V.L.R.Fields {
@@ -209,7 +210,6 @@ func transformRecordType(rt *RecordType) {
 					env.V.S = []string{"Optional"}
 				}
 			}
-			addAdditionalEnvVars = true
 		} else if field.V.L != nil && field.V.L.R != nil {
 			transformRecordType(field.V.L.R)
 		}
