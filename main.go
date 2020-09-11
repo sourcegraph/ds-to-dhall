@@ -218,7 +218,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	}
 	res.ApiVersion = apiVersion
 
-	res.DhallType = fmt.Sprintf("(https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/f4bf4b9ddf669f7149ec32150863a93d6c4b3ef1/1.18/schemas.dhall).%s.TokenType", res.Kind)
+	res.DhallType = fmt.Sprintf("(https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/f4bf4b9ddf669f7149ec32150863a93d6c4b3ef1/1.18/schemas.dhall).%s.Type", res.Kind)
 
 	metadata, ok := res.Contents["metadata"].(map[string]interface{})
 	if !ok {
