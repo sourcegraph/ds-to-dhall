@@ -168,7 +168,17 @@ func improvedDockerImageType() *RecordType {
 	return icrt
 }
 
+const additionalEnvVarsTypeDhall = `{ additionalEnv : Optional (List { name : Text, value : Text })}`
+
+func additionalEnvVarsType() *RecordType {
+	bf := bytes.NewReader([]byte(additionalEnvVarsTypeDhall))
+
+	t, _ := parseRecordType(bf)
+	return t
+}
+
 func transformRecordType(rt *RecordType) {
+	addAdditionalEnvVars := false
 	for _, field := range rt.Fields {
 		if (field.K == "limits" || field.K == "requests") && field.V.L != nil && field.V.L.R != nil {
 			field.V.L.R = improvedContainerResourcesType()
@@ -176,8 +186,37 @@ func transformRecordType(rt *RecordType) {
 			idr := improvedDockerImageType()
 			field.V.L.U = idr.Fields[0].V.L.U
 			field.V.L.R = nil
+			addAdditionalEnvVars = true
+		} else if field.K == "metadata" && field.V.L.R != nil {
+			alreadyPresent := false
+			for _, f := range field.V.L.R.Fields {
+				if f.K == "namespace" {
+					alreadyPresent = true
+				}
+			}
+			if !alreadyPresent {
+				namespaceValue := &ValueType{
+					S: []string{"Optional", "Text"},
+				}
+				namespaceField := &FieldType{
+					K: "namespace",
+					V: namespaceValue,
+				}
+				field.V.L.R.Fields = append(field.V.L.R.Fields, namespaceField)
+			}
+		} else if field.K == "env" && field.V.L.R != nil {
+			for _, env := range field.V.L.R.Fields {
+				if len(env.V.S) == 0 {
+					env.V.S = []string{"Optional"}
+				}
+			}
 		} else if field.V.L != nil && field.V.L.R != nil {
 			transformRecordType(field.V.L.R)
 		}
+	}
+
+	if addAdditionalEnvVars {
+		t := additionalEnvVarsType()
+		rt.Fields = append(rt.Fields, t.Fields[0])
 	}
 }
