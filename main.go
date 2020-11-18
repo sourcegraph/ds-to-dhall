@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
+	"github.com/philandstuff/dhall-golang/v5/parser"
+	"github.com/philandstuff/dhall-golang/v5/term"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
@@ -33,7 +35,6 @@ var (
 	schemaFile      string
 	componentsFile  string
 	timeout         time.Duration
-	useK8sSchema    bool
 	ignoreFiles     []string
 	strengthen      bool
 
@@ -47,9 +48,8 @@ func init() {
 	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flag.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
-	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
-	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records). ignored if useK8sSchema is set")
+	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records)")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 	flag.BoolVar(&printVersion, "version", false, "print version information")
 
@@ -104,16 +104,18 @@ func main() {
 
 	log15.Info("execute yaml-to-dhall", "destination", destinationFile)
 
-	dhallType := ""
-	if useK8sSchema {
-		dhallType = composeK8sDhallType(srcSet)
-	} else {
-		dhallTypeStr, err := composeSimplifiedDhallType(yamlBytes)
+	dhallType := composeK8sDhallType(srcSet)
+	if strengthen {
+		sdt, err := strengthenDhallType(dhallType)
 		if err != nil {
-			logFatal("failed to compose simplified dhall type", "error", err)
+			tmpFile, _ := ioutil.TempFile("", "record_type.dhall")
+			_ = ioutil.WriteFile(tmpFile.Name(), []byte(dhallType), 0644)
+			_ = dhallFormat(tmpFile.Name())
+			logFatal("failed to strengthen dhall type", "error", err, "type file", tmpFile.Name())
 		}
-		dhallType = dhallTypeStr
+		dhallType = sdt
 	}
+
 	if typeFile != "" {
 		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0644)
 		if err != nil {
@@ -455,35 +457,24 @@ func composeK8sDhallType(rs *ResourceSet) string {
 	return strings.Join(schemas, " ⩓ ")
 }
 
-func composeSimplifiedDhallType(yamlBytes []byte) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*2)
-	defer cancel()
-
-	dhallTypeBytes, err := dhallRecordToType(ctx, yamlBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to derive dhall type from record: %v", err)
-	}
-
-	if !strengthen {
-		return string(dhallTypeBytes), nil
-	}
-
-	rt, err := parseRecordType(bytes.NewReader(dhallTypeBytes))
+func strengthenDhallType(dhallType string) (string, error) {
+	tt, err := parser.ParseReader("record_type.dhall", strings.NewReader(dhallType))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse dhall type: %v", err)
 	}
 
-	transformRecordType(rt)
+	op, ok := tt.(term.Op)
+	if !ok {
+		return "", fmt.Errorf("expected term.Op, got %+v", tt)
+	}
 
-	var sb strings.Builder
+	//transformRecordType(op)
 
-	rt.ToDhall(&sb, 1)
-
-	return sb.String(), nil
+	return op.String(), nil
 }
 
 func strengthenRecord(rec map[string]interface{}) map[string]interface{} {
-	if !strengthen || useK8sSchema {
+	if !strengthen {
 		return rec
 	}
 
@@ -539,37 +530,6 @@ func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst strin
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
-}
-
-func yamlToSimplifiedDhall(ctx context.Context, yamlBytes []byte) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "yaml-to-dhall", "--records-loose")
-	cmd.Stdin = bytes.NewReader(yamlBytes)
-	cmd.Stderr = os.Stderr
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err := cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func dhallRecordToType(ctx context.Context, yamlBytes []byte) ([]byte, error) {
-	dhallRecordBytes, err := yamlToSimplifiedDhall(ctx, yamlBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.CommandContext(ctx, "dhall", "type")
-	cmd.Stdin = bytes.NewReader(dhallRecordBytes)
-	cmd.Stderr = os.Stderr
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err = cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func dhallFormat(file string) error {
