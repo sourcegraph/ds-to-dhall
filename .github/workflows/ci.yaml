@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -72,7 +72,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -99,7 +99,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -114,7 +114,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
@@ -129,7 +129,7 @@ jobs:
     steps:
       - uses: 'actions/checkout@v2'
       - name: '[setup] Install asdf'
-        uses: 'asdf-vm/actions/setup@v1.0.0'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
       - name: '[setup] Install asdf plugins'
         run: './ci/asdf-add-plugins.sh'
       - name: '[setup] Install asdf .tool-versions'
