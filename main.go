@@ -33,9 +33,8 @@ var (
 	schemaFile      string
 	componentsFile  string
 	timeout         time.Duration
-	useK8sSchema    bool
 	ignoreFiles     []string
-	strengthen      bool
+	schemaURL       string
 
 	printHelp    bool
 	printVersion bool
@@ -47,9 +46,9 @@ func init() {
 	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flag.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
-	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
-	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records). ignored if useK8sSchema is set")
+	flag.StringVarP(&schemaURL, "k8sSchemaURL", "u",
+		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18/schemas.dhall", "URL to k8s schemas.dhall file")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 	flag.BoolVar(&printVersion, "version", false, "print version information")
 
@@ -104,16 +103,7 @@ func main() {
 
 	log15.Info("execute yaml-to-dhall", "destination", destinationFile)
 
-	dhallType := ""
-	if useK8sSchema {
-		dhallType = composeK8sDhallType(srcSet)
-	} else {
-		dhallTypeStr, err := composeSimplifiedDhallType(yamlBytes)
-		if err != nil {
-			logFatal("failed to compose simplified dhall type", "error", err)
-		}
-		dhallType = dhallTypeStr
-	}
+	dhallType := composeK8sDhallType(srcSet)
 	if typeFile != "" {
 		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0644)
 		if err != nil {
@@ -250,7 +240,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	}
 	res.ApiVersion = apiVersion
 
-	res.DhallType = fmt.Sprintf("(https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/f4bf4b9ddf669f7149ec32150863a93d6c4b3ef1/1.18/schemas.dhall).%s.Type", res.Kind)
+	res.DhallType = fmt.Sprintf("(%s).%s.Type", schemaURL, res.Kind)
 
 	metadata, ok := res.Contents["metadata"].(map[string]interface{})
 	if !ok {
@@ -455,48 +445,6 @@ func composeK8sDhallType(rs *ResourceSet) string {
 	return strings.Join(schemas, " ⩓ ")
 }
 
-func composeSimplifiedDhallType(yamlBytes []byte) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*2)
-	defer cancel()
-
-	dhallTypeBytes, err := dhallRecordToType(ctx, yamlBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to derive dhall type from record: %v", err)
-	}
-
-	if !strengthen {
-		return string(dhallTypeBytes), nil
-	}
-
-	rt, err := parseRecordType(bytes.NewReader(dhallTypeBytes))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse dhall type: %v", err)
-	}
-
-	transformRecordType(rt)
-
-	var sb strings.Builder
-
-	rt.ToDhall(&sb, 1)
-
-	return sb.String(), nil
-}
-
-func strengthenRecord(rec map[string]interface{}) map[string]interface{} {
-	if !strengthen || useK8sSchema {
-		return rec
-	}
-
-	// more transformation will reveal themselves as we work through the PoC assignment
-	srec, err := transformList2Record(rec)
-	if err != nil {
-		log15.Warn("failed to strengthen record, returning original", "record", rec, "err", err)
-		return rec
-	}
-	srec = transformDockerImageSpec(srec)
-	return srec
-}
-
 func buildRecord(rs *ResourceSet) map[string]interface{} {
 	record := make(map[string]interface{})
 
@@ -509,7 +457,7 @@ func buildRecord(rs *ResourceSet) map[string]interface{} {
 				kindRec = make(map[string]interface{})
 				compRec[r.Kind] = kindRec
 			}
-			kindRec[r.Name] = strengthenRecord(r.Contents)
+			kindRec[r.Name] = r.Contents
 		}
 	}
 
@@ -632,7 +580,7 @@ func buildComponents(rs *ResourceSet) map[string]interface{} {
 			kindRec[r.Name] = km
 			if r.Kind == "Deployment" || r.Kind == "StatefulSet" || r.Kind == "DaemonSet" {
 				containers := make(map[string]interface{})
-				found := extractContainersMap(strengthenRecord(r.Contents), containers)
+				found := extractContainersMap(r.Contents, containers)
 				if found {
 					km["containers"] = containers
 				}
