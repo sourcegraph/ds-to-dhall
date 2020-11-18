@@ -489,37 +489,6 @@ func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst strin
 	return cmd.Run()
 }
 
-func yamlToSimplifiedDhall(ctx context.Context, yamlBytes []byte) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "yaml-to-dhall", "--records-loose")
-	cmd.Stdin = bytes.NewReader(yamlBytes)
-	cmd.Stderr = os.Stderr
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err := cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func dhallRecordToType(ctx context.Context, yamlBytes []byte) ([]byte, error) {
-	dhallRecordBytes, err := yamlToSimplifiedDhall(ctx, yamlBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.CommandContext(ctx, "dhall", "type")
-	cmd.Stdin = bytes.NewReader(dhallRecordBytes)
-	cmd.Stderr = os.Stderr
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err = cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 func dhallFormat(file string) error {
 	cmd := exec.Command("dhall", "format", "--inplace", file)
 	cmd.Stderr = os.Stderr
