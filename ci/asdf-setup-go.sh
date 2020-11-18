@@ -5,5 +5,5 @@ set -euxo pipefail
 
 ASDF_GOLANG_DIRECTORY="$(asdf where golang)/go"
 
-# https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
-echo "::set-env name=GOROOT::${ASDF_GOLANG_DIRECTORY}"
+# https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-commands-for-github-actions#environment-files
+echo "GOROOT=${ASDF_GOLANG_DIRECTORY}" >>"$GITHUB_ENV"

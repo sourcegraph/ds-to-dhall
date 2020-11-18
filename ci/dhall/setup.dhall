@@ -9,7 +9,7 @@ let Checkout =
 let ASDFSteps =
       [ GitHubActions.Step::{
         , name = Some "[setup] Install asdf"
-        , uses = Some "asdf-vm/actions/setup@v1.0.0"
+        , uses = Some "asdf-vm/actions/setup@v1.0.1"
         }
       , GitHubActions.Step::{
         , name = Some "[setup] Install asdf plugins"
