@@ -31,9 +31,9 @@ var (
 	destinationFile string
 	typeFile        string
 	schemaFile      string
+	schemaURL       string
 	componentsFile  string
 	timeout         time.Duration
-	useK8sSchema    bool
 	ignoreFiles     []string
 	strengthen      bool
 
@@ -43,13 +43,14 @@ var (
 
 func init() {
 	flag.StringVarP(&destinationFile, "output", "o", "", "(required) dhall output file")
-	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
-	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
+	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file. ignored if strengthen is set")
+	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file. ignored if strengthen is set")
 	flag.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
 	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
-	flag.BoolVarP(&useK8sSchema, "useK8sSchema", "k", false, "use k8s schema for resource contents when generating output")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
-	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records). ignored if useK8sSchema is set")
+	flag.BoolVar(&strengthen, "strengthenSchema", false, "if set transforms output to stronger types (for example converts lists to records)")
+	flag.StringVarP(&schemaURL, "k8sSchemaURL", "u",
+		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18/schemas.dhall", "URL to k8s schemas.dhall file")
 	flag.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 	flag.BoolVar(&printVersion, "version", false, "print version information")
 
@@ -105,16 +106,11 @@ func main() {
 	log15.Info("execute yaml-to-dhall", "destination", destinationFile)
 
 	dhallType := ""
-	if useK8sSchema {
+	if !strengthen {
 		dhallType = composeK8sDhallType(srcSet)
-	} else {
-		dhallTypeStr, err := composeSimplifiedDhallType(yamlBytes)
-		if err != nil {
-			logFatal("failed to compose simplified dhall type", "error", err)
-		}
-		dhallType = dhallTypeStr
 	}
-	if typeFile != "" {
+
+	if typeFile != "" && !strengthen {
 		err = ioutil.WriteFile(typeFile, []byte(dhallType), 0644)
 		if err != nil {
 			logFatal("failed to write dhall type", "error", err, "typeFile", typeFile)
@@ -149,7 +145,7 @@ func main() {
 		logFatal("failed to prepend generated comment to dhall file", "error", err, "file", destinationFile)
 	}
 
-	if schemaFile != "" {
+	if schemaFile != "" && !strengthen {
 		recordContents, err := ioutil.ReadFile(destinationFile)
 		if err != nil {
 			logFatal("failed to read record contents", "error", err, "destinationFile", destinationFile)
@@ -250,7 +246,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 	}
 	res.ApiVersion = apiVersion
 
-	res.DhallType = fmt.Sprintf("(https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/f4bf4b9ddf669f7149ec32150863a93d6c4b3ef1/1.18/schemas.dhall).%s.Type", res.Kind)
+	res.DhallType = fmt.Sprintf("(%s).%s.Type", schemaURL, res.Kind)
 
 	metadata, ok := res.Contents["metadata"].(map[string]interface{})
 	if !ok {
@@ -455,35 +451,8 @@ func composeK8sDhallType(rs *ResourceSet) string {
 	return strings.Join(schemas, " ⩓ ")
 }
 
-func composeSimplifiedDhallType(yamlBytes []byte) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*2)
-	defer cancel()
-
-	dhallTypeBytes, err := dhallRecordToType(ctx, yamlBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to derive dhall type from record: %v", err)
-	}
-
-	if !strengthen {
-		return string(dhallTypeBytes), nil
-	}
-
-	rt, err := parseRecordType(bytes.NewReader(dhallTypeBytes))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse dhall type: %v", err)
-	}
-
-	transformRecordType(rt)
-
-	var sb strings.Builder
-
-	rt.ToDhall(&sb, 1)
-
-	return sb.String(), nil
-}
-
 func strengthenRecord(rec map[string]interface{}) map[string]interface{} {
-	if !strengthen || useK8sSchema {
+	if !strengthen {
 		return rec
 	}
 
@@ -539,37 +508,6 @@ func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst strin
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
-}
-
-func yamlToSimplifiedDhall(ctx context.Context, yamlBytes []byte) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "yaml-to-dhall", "--records-loose")
-	cmd.Stdin = bytes.NewReader(yamlBytes)
-	cmd.Stderr = os.Stderr
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err := cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func dhallRecordToType(ctx context.Context, yamlBytes []byte) ([]byte, error) {
-	dhallRecordBytes, err := yamlToSimplifiedDhall(ctx, yamlBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.CommandContext(ctx, "dhall", "type")
-	cmd.Stdin = bytes.NewReader(dhallRecordBytes)
-	cmd.Stderr = os.Stderr
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err = cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func dhallFormat(file string) error {
