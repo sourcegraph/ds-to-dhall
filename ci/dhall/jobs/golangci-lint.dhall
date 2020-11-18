@@ -12,8 +12,8 @@ in  Job::{
           SetupSteps
         # [ GitHubActions.Step::{
             , name = Some "golangci-lint"
-            , uses = Some "golangci/golangci-lint-action@v1"
-            , `with` = Some (toMap { version = "v1.30" })
+            , uses = Some "golangci/golangci-lint-action@v2.3.0"
+            , `with` = Some (toMap { version = "v1.32.2" })
             }
           ]
     }

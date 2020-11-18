@@ -63,9 +63,9 @@ jobs:
       - name: '[setup] prepare go environment'
         run: './ci/asdf-setup-go.sh'
       - name: golangci-lint
-        uses: 'golangci/golangci-lint-action@v1'
+        uses: 'golangci/golangci-lint-action@v2.3.0'
         with:
-          version: v1.30
+          version: v1.32.2
   goreleaser:
     name: goreleaser
     runs-on: ubuntu-latest
