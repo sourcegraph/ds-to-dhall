@@ -468,7 +468,7 @@ func composeK8sDhallType(rs *ResourceSet) string {
 		}
 	}
 
-	return strings.Join(schemas, " ⩓ ")
+	return strings.Join(schemas, " //\\\\ ")
 }
 
 func buildRecord(rs *ResourceSet) map[string]interface{} {
