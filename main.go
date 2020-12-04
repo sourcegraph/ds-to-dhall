@@ -271,7 +271,6 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 
 	if res.Kind == "StatefulSet" {
 		// patch statefulsets
-
 		spec, ok := res.Contents["spec"].(map[string]interface{})
 		if !ok {
 			return nil, fmt.Errorf("resource %s is missing spec section", filename)
@@ -507,7 +506,19 @@ func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst strin
 	if schema == "" {
 		cmd = exec.CommandContext(ctx, "yaml-to-dhall", "--records-loose", "--output", dst)
 	} else {
-		cmd = exec.CommandContext(ctx, "yaml-to-dhall", schema, "--records-loose", "--output", dst)
+		// write type into a temp file because passing it on the command line exceeds the limit of characters from some shells
+		typeFile, err := ioutil.TempFile("", "ds-to-dhall-type-")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(typeFile.Name())
+
+		err = ioutil.WriteFile(typeFile.Name(), []byte(schema), 0644)
+		if err != nil {
+			return err
+		}
+
+		cmd = exec.CommandContext(ctx, "yaml-to-dhall", typeFile.Name(), "--records-loose", "--output", dst)
 	}
 	cmd.Stdin = bytes.NewReader(yamlBytes)
 	cmd.Stderr = os.Stderr
@@ -522,7 +533,7 @@ func dhallFormat(file string) error {
 }
 
 func prependLine(file string, line string) error {
-	tmpFile, err := ioutil.TempFile("", "ds-to-dhall")
+	tmpFile, err := ioutil.TempFile("", "ds-to-dhall-")
 	if err != nil {
 		return err
 	}
