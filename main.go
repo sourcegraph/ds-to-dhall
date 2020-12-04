@@ -125,8 +125,7 @@ func main() {
 
 	err = yamlToDhall(ctx, dhallType, yamlBytes, destinationFile)
 	if err != nil {
-		_ = ioutil.WriteFile("record.yaml", yamlBytes, 0644)
-		logFatal("failed to execute yaml-to-dhall", "error", err, "dhallType", dhallType, "yaml", "record.yaml")
+		logFatal("failed to execute yaml-to-dhall", "error", err)
 	}
 
 	err = dhallFormat(destinationFile)
@@ -270,8 +269,9 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 		}
 	}
 
-	// patch statefulsets
 	if res.Kind == "StatefulSet" {
+		// patch statefulsets
+
 		spec, ok := res.Contents["spec"].(map[string]interface{})
 		if !ok {
 			return nil, fmt.Errorf("resource %s is missing spec section", filename)
@@ -287,6 +287,32 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 			}
 			vct["apiVersion"] = "apps/v1"
 			vct["kind"] = "PersistentVolumeClaim"
+		}
+	} else if res.Kind == "CronJob" {
+		// patch cronjob
+		spec, ok := res.Contents["spec"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("resource %s is missing spec section", filename)
+		}
+		jobTemplateSpec, ok := spec["jobTemplate"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("resource %s is missing jobTemplate section", filename)
+		}
+
+		_, ok = jobTemplateSpec["metadata"].(map[string]interface{})
+		if !ok {
+			jobTemplateSpec["metadata"] = make(map[string]interface{})
+		}
+	} else if res.Kind == "PersistentVolume" {
+		// patch persistentvolume
+		spec, ok := res.Contents["spec"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("resource %s is missing spec section", filename)
+		}
+		claimRef, ok := spec["claimRef"].(map[string]interface{})
+		if ok {
+			claimRef["apiVersion"] = "v1"
+			claimRef["kind"] = "PersistentVolumeClaim"
 		}
 	}
 
@@ -442,7 +468,7 @@ func composeK8sDhallType(rs *ResourceSet) string {
 		}
 	}
 
-	return strings.Join(schemas, " ⩓ ")
+	return strings.Join(schemas, " //\\\\ ")
 }
 
 func buildRecord(rs *ResourceSet) map[string]interface{} {
