@@ -3,6 +3,7 @@ module ds-to-dhall
 go 1.15
 
 require (
+	github.com/briandowns/spinner v1.12.0
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/inconshreveable/log15 v0.0.0-20200109203555-b30bc20e4fd1
 	github.com/kr/pretty v0.1.0 // indirect

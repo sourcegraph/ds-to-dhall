@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/inconshreveable/log15"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -45,7 +46,7 @@ func init() {
 	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flag.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
-	flag.DurationVar(&timeout, "timeout", 3*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+	flag.DurationVar(&timeout, "timeout", 4*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
 	flag.StringVarP(&schemaURL, "k8sSchemaURL", "u",
 		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18/schemas.dhall", "URL to k8s schemas.dhall file")
@@ -128,10 +129,14 @@ func main() {
 		logFatal("failed to execute yaml-to-dhall", "error", err)
 	}
 
+	log15.Info("formatting output")
+
 	err = dhallFormat(destinationFile)
 	if err != nil {
 		logFatal("failed to format dhall file", "error", err, "file", destinationFile)
 	}
+
+	log15.Info("prepending generated comment")
 
 	err = prependLine(destinationFile, GeneratedComment)
 	if err != nil {
@@ -139,6 +144,8 @@ func main() {
 	}
 
 	if schemaFile != "" {
+		log15.Info("creating schema file")
+
 		recordContents, err := ioutil.ReadFile(destinationFile)
 		if err != nil {
 			logFatal("failed to read record contents", "error", err, "destinationFile", destinationFile)
@@ -162,6 +169,8 @@ func main() {
 	}
 
 	if componentsFile != "" {
+		log15.Info("creating components file")
+
 		componentsBytes, err := buildYaml(buildComponents(srcSet))
 		if err != nil {
 			logFatal("failed to build components yaml", "error", err)
@@ -502,6 +511,11 @@ func buildYaml(record map[string]interface{}) ([]byte, error) {
 }
 
 func yamlToDhall(ctx context.Context, schema string, yamlBytes []byte, dst string) error {
+	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	spin.Prefix = "Running yaml-to-dhall: "
+	spin.Start()
+	defer spin.Stop()
+
 	var cmd *exec.Cmd
 	if schema == "" {
 		cmd = exec.CommandContext(ctx, "yaml-to-dhall", "--records-loose", "--output", dst)
