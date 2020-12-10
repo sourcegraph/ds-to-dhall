@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -46,7 +47,7 @@ func init() {
 	flag.StringVarP(&typeFile, "type", "t", "", "dhall output type file")
 	flag.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flag.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
-	flag.DurationVar(&timeout, "timeout", 4*time.Minute, "length of time to run yaml-to-dhall command before timing out")
+	flag.DurationVar(&timeout, "timeout", 5*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flag.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
 	flag.StringVarP(&schemaURL, "k8sSchemaURL", "u",
 		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18/schemas.dhall", "URL to k8s schemas.dhall file")
@@ -122,6 +123,19 @@ func main() {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	defer func() {
+		signal.Stop(c)
+		cancel()
+	}()
+	go func() {
+		select {
+		case <-c:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 	defer cancel()
 
 	err = yamlToDhall(ctx, dhallType, yamlBytes, destinationFile)
