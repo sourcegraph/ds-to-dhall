@@ -485,7 +485,7 @@ func composeK8sDhallType(rs *ResourceSet) string {
 
 	for component, resources := range rs.Components {
 		for _, r := range resources {
-			s := fmt.Sprintf("{ %s : { %s : { %s : %s } } }", strings.Title(component), r.Kind, r.Name, r.DhallType)
+			s := fmt.Sprintf("{ %s : { %s : { %s : %s } } }", component, r.Kind, r.Name, r.DhallType)
 			schemas = append(schemas, s)
 		}
 	}
@@ -498,7 +498,7 @@ func buildRecord(rs *ResourceSet) map[string]interface{} {
 
 	for component, resources := range rs.Components {
 		compRec := make(map[string]map[string]interface{})
-		record[strings.Title(component)] = compRec
+		record[component] = compRec
 		for _, r := range resources {
 			kindRec := compRec[r.Kind]
 			if kindRec == nil {
@@ -603,7 +603,7 @@ func buildComponents(rs *ResourceSet) map[string]interface{} {
 
 	for component, resources := range rs.Components {
 		compRec := make(map[string]map[string]interface{})
-		record[strings.Title(component)] = compRec
+		record[component] = compRec
 		for _, r := range resources {
 			kindRec := compRec[r.Kind]
 			if kindRec == nil {
