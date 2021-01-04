@@ -307,7 +307,7 @@ func loadResource(rootDir string, filename string) (*Resource, error) {
 			if !ok {
 				return nil, fmt.Errorf("resource %s is missing volumeClaimTemplate section", filename)
 			}
-			vct["apiVersion"] = "apps/v1"
+			vct["apiVersion"] = "v1"
 			vct["kind"] = "PersistentVolumeClaim"
 		}
 	} else if res.Kind == "CronJob" {
