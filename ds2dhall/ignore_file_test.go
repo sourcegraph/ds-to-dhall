@@ -1,4 +1,4 @@
-package main
+package ds2dhall
 
 import "testing"
 
