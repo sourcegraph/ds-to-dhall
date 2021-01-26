@@ -14,6 +14,7 @@ import (
 
 	"github.com/briandowns/spinner"
 	"github.com/inconshreveable/log15"
+	gitignore "github.com/sabhiram/go-gitignore"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
@@ -51,7 +52,7 @@ func Main(args []string) {
 
 	flagSet.StringVarP(&destinationPath, "output", "o", "", "(required) path to a destination directory")
 	flagSet.DurationVar(&timeout, "timeout", 5*time.Minute, "length of time to run dhall command before timing out")
-	flagSet.StringArrayVarP(&ignore, "ignore", "i", nil, "omit output for resources matching one of the ignore COMKIR paths")
+	flagSet.StringArrayVarP(&ignore, "ignore", "i", nil, "omit output for resources matching one of the ignore COMKIR paths. specify path with '/' separator. uses gitignore semantics for matching")
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
@@ -100,7 +101,7 @@ func Main(args []string) {
 		logFatal("failed to execute dhall-to-yaml", "error", err)
 	}
 
-	err = exportComponents(componentTree, destinationPath)
+	err = exportComponents(componentTree, destinationPath, ignore)
 
 	if err != nil {
 		logFatal("failed to export", "err", err)
@@ -146,7 +147,9 @@ func exportYAML(contents map[string]interface{}, destinationPath string) error {
 	return encoder.Encode(contents)
 }
 
-func exportComponents(componentTree map[string]interface{}, destinationPath string) error {
+func exportComponents(componentTree map[string]interface{}, destinationPath string, ignore []string) error {
+	gitIgnoreMatcher := gitignore.CompileIgnoreLines(ignore...)
+
 	for componentName, component := range componentTree {
 		componentMap, ok := component.(map[string]interface{})
 		if !ok {
@@ -160,6 +163,10 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 			}
 
 			for resourceName, resource := range kindMap {
+				if gitIgnoreMatcher.MatchesPath(filepath.Join(componentName, kindName, resourceName)) {
+					continue
+				}
+
 				resourceMap, ok := resource.(map[string]interface{})
 				if !ok {
 					return fmt.Errorf("resource value for %s.%s.%s is not a record",

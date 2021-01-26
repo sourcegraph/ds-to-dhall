@@ -18,6 +18,7 @@ import (
 	"ds-to-dhall/comkir"
 	"github.com/briandowns/spinner"
 	"github.com/inconshreveable/log15"
+	gitignore "github.com/sabhiram/go-gitignore"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
@@ -48,7 +49,7 @@ func Main(args []string) {
 	flagSet.StringVarP(&schemaFile, "schema", "s", "", "dhall output schema file")
 	flagSet.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
 	flagSet.DurationVar(&timeout, "timeout", 5*time.Minute, "length of time to run yaml-to-dhall command before timing out")
-	flagSet.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching glob pattern will be ignored")
+	flagSet.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching these gitignore patterns will be ignored")
 	flagSet.StringVarP(&schemaURL, "k8sSchemaURL", "u",
 		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18/schemas.dhall", "URL to k8s schemas.dhall file")
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
@@ -354,42 +355,6 @@ func commonPrefix(paths []string) (string, error) {
 	return strings.Join(cp, string(os.PathSeparator)), nil
 }
 
-// implements a primitive suffix match using filepath.Match
-// note: these are not the same semantics as .gitignore
-func matchIgnore(pattern, path string) (bool, error) {
-	if len(path) == 0 {
-		return false, nil
-	}
-	sep := string(os.PathSeparator)
-	parts := strings.Split(path, sep)
-
-	for idx := len(parts) - 1; idx >= 0; idx-- {
-		p := strings.Join(parts[idx:], sep)
-
-		ignore, err := filepath.Match(pattern, p)
-		if err != nil {
-			return false, err
-		}
-		if ignore {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func ignorePath(path string) (bool, error) {
-	for _, ignorePattern := range ignoreFiles {
-		ignore, err := matchIgnore(ignorePattern, path)
-		if err != nil {
-			return false, err
-		}
-		if ignore {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func loadResourceSet(inputs []string) (*comkir.ResourceSet, error) {
 	pas, err := makeAbs(inputs)
 	if err != nil {
@@ -402,6 +367,7 @@ func loadResourceSet(inputs []string) (*comkir.ResourceSet, error) {
 	var rs comkir.ResourceSet
 	rs.Components = make(map[string][]*comkir.Resource)
 	rs.Root = cr
+	gitIgnoreMatcher := gitignore.CompileIgnoreLines(ignoreFiles...)
 
 	for _, input := range pas {
 		err = filepath.Walk(input, func(path string, info os.FileInfo, err error) error {
@@ -409,10 +375,7 @@ func loadResourceSet(inputs []string) (*comkir.ResourceSet, error) {
 				return err
 			}
 
-			ignore, err := ignorePath(path)
-			if err != nil {
-				return err
-			}
+			ignore := gitIgnoreMatcher.MatchesPath(path)
 			if ignore && info.IsDir() {
 				return filepath.SkipDir
 			}
