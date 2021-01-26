@@ -21,6 +21,16 @@ func logFatal(message string, ctx ...interface{}) {
 	os.Exit(1)
 }
 
+func usageArgs() string {
+	b := bytes.Buffer{}
+	w := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
+
+	fmt.Fprintln(w, "\t<path>\t(required) dhall file to process")
+	w.Flush()
+
+	return fmt.Sprintf("ARGS:\n%s", b.String())
+}
+
 var (
 	printHelp bool
 
@@ -135,14 +145,10 @@ func Main(args []string) {
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
-		b := bytes.Buffer{}
-		w := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
-
-		fmt.Fprintln(w, "\t<path>\t(required) ")
-		w.Flush()
-
-		fmt.Fprintf(os.Stderr, "ARGS:\n%s", b.String())
+		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall dockerimg: <path>\n")
+		fmt.Fprintln(os.Stderr, "OPTIONS:")
 		flagSet.PrintDefaults()
+		fmt.Fprintln(os.Stderr, usageArgs())
 	}
 
 	_ = flagSet.Parse(args)
