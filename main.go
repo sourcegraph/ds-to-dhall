@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -12,6 +13,26 @@ import (
 	"github.com/inconshreveable/log15"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
+func versionString(version, commit, date string) string {
+	b := bytes.Buffer{}
+	w := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
+
+	fmt.Fprintf(w, "version:\t%s", version)
+	fmt.Fprintln(w, "")
+	fmt.Fprintf(w, "commit:\t%s", commit)
+	fmt.Fprintln(w, "")
+	fmt.Fprintf(w, "build date:\t%s", date)
+	w.Flush()
+
+	return b.String()
+}
+
 func main() {
 	cmds := make(map[string]func([]string))
 	shortDescriptions := make(map[string]string)
@@ -22,11 +43,12 @@ func main() {
 	cmds["dhall2ds"] = dhall2ds.Main
 	shortDescriptions["dhall2ds"] = dhall2ds.ShortDescription
 
-	cmdNames := make([]string, 0, len(cmds)+1)
+	cmdNames := make([]string, 0, len(cmds)+2)
 	for cmdName := range cmds {
 		cmdNames = append(cmdNames, cmdName)
 	}
 	cmdNames = append(cmdNames, "help")
+	cmdNames = append(cmdNames, "version")
 
 	log15.Root().SetHandler(log15.StreamHandler(os.Stdout, log15.LogfmtFormat()))
 
@@ -42,6 +64,8 @@ func main() {
 			for cmdName := range cmds {
 				fmt.Fprintf(w, "\t%s\t%s\n", cmdName, shortDescriptions[cmdName])
 			}
+			fmt.Fprintln(w, "\thelp\tshows help for commands")
+			fmt.Fprintln(w, "\tversion\tshows version string")
 			w.Flush()
 			os.Exit(0)
 		}
@@ -54,6 +78,12 @@ func main() {
 		}
 
 		cmd([]string{"-h"})
+	}
+
+	if os.Args[1] == "version" {
+		output := versionString(version, commit, date)
+		fmt.Fprintln(os.Stderr, output)
+		os.Exit(0)
 	}
 
 	cmd, ok := cmds[os.Args[1]]
