@@ -59,7 +59,7 @@ func Main(args []string) {
 		fmt.Fprintln(os.Stderr, usageArgs())
 	}
 
-	flagSet.Parse(args)
+	_ = flagSet.Parse(args)
 
 	if printHelp {
 		flagSet.Usage()

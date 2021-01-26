@@ -145,7 +145,7 @@ func Main(args []string) {
 		flagSet.PrintDefaults()
 	}
 
-	flagSet.Parse(args)
+	_ = flagSet.Parse(args)
 
 	if printHelp {
 		flagSet.Usage()
