@@ -16,6 +16,8 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+const ShortDescription = "finds docker image tags in input files and adds them as Dhall records to a list"
+
 func logFatal(message string, ctx ...interface{}) {
 	log15.Error(message, ctx...)
 	os.Exit(1)
@@ -145,6 +147,7 @@ func Main(args []string) {
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
+		fmt.Fprintf(os.Stderr, "dockerimg %s\n", ShortDescription)
 		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall dockerimg: <path>\n")
 		fmt.Fprintln(os.Stderr, "OPTIONS:")
 		flagSet.PrintDefaults()

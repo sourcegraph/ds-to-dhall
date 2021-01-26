@@ -38,6 +38,8 @@ var (
 	flagSet *flag.FlagSet
 )
 
+const ShortDescription = "imports a deploy-sourcegraph/base into a COMKIR Dhall record"
+
 func Main(args []string) {
 	flagSet = flag.NewFlagSet("ds2dhall", flag.ExitOnError)
 
@@ -52,6 +54,7 @@ func Main(args []string) {
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
+		fmt.Fprintf(os.Stderr, "ds2dhall %s\n", ShortDescription)
 		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall ds2dhall: --output <output> <path>...\n")
 		fmt.Fprintln(os.Stderr, "OPTIONS:")
 		flagSet.PrintDefaults()

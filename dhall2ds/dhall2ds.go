@@ -18,6 +18,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const ShortDescription = "exports a COMKIR Dhall record to a directory tree of YAML manifests"
+
 var (
 	destinationPath string
 	timeout         time.Duration
@@ -53,6 +55,7 @@ func Main(args []string) {
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
+		fmt.Fprintf(os.Stderr, "dhall2ds %s\n", ShortDescription)
 		fmt.Fprintf(os.Stderr, "Usage of ds-to-dhall dhall2ds: --output <output> <path>\n")
 		fmt.Fprintln(os.Stderr, "OPTIONS:")
 		flagSet.PrintDefaults()
