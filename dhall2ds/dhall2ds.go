@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -114,16 +115,28 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 	spin.Start()
 	defer spin.Stop()
 
-	var ob bytes.Buffer
-	cmd := exec.CommandContext(ctx, "dhall-to-yaml", "--file", dhallFile)
-	cmd.Stdout = &ob
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+
+	bin := "dhall-to-yaml"
+	args := []string{"--file", dhallFile}
+
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
 
 	err := cmd.Run()
 	if err != nil {
-		return nil, err
+
+		command := append([]string{bin}, args...)
+		return nil, &cmdErr{
+			command: strings.Join(command, " "),
+			stdOut:  outBuf.String(),
+			stdErr:  errBuf.String(),
+		}
 	}
 
-	decoder := yaml.NewDecoder(&ob)
+	decoder := yaml.NewDecoder(&outBuf)
 
 	var rv map[string]interface{}
 	err = decoder.Decode(&rv)
@@ -131,6 +144,21 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 		return nil, err
 	}
 	return rv, nil
+}
+
+type cmdErr struct {
+	command string
+	stdOut  string
+	stdErr  string
+}
+
+func (c *cmdErr) Error() string {
+
+	return strings.Join([]string{
+		fmt.Sprintf("command: %q", c.command),
+		fmt.Sprintf("standard out:\n%s", c.stdOut),
+		fmt.Sprintf("standard err:\n%s", c.stdErr),
+	}, "\n")
 }
 
 func exportYAML(contents map[string]interface{}, destinationPath string) error {
