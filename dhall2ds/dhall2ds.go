@@ -100,7 +100,7 @@ func Main(args []string) {
 
 	componentTree, err := dhallToYAML(ctx, flagSet.Arg(0))
 	if err != nil {
-		if e, ok := err.(*cmdErr); ok {
+		if e, ok := err.(*commandError); ok {
 			// bypass log15 to have more control over what the error output looks like
 			// (newlines)
 			log.Fatalf("failed to execute dhall-to-yaml, err:\n%s", e)
@@ -136,7 +136,7 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 	if err != nil {
 		command := append([]string{bin}, args...)
 
-		return nil, &cmdErr{
+		return nil, &commandError{
 			err:     err,
 			command: strings.Join(command, " "),
 			stdOut:  outBuf.String(),
@@ -154,14 +154,14 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 	return rv, nil
 }
 
-type cmdErr struct {
+type commandError struct {
 	command string
 	stdOut  string
 	stdErr  string
 	err     error
 }
 
-func (c *cmdErr) Error() string {
+func (c *commandError) Error() string {
 	return strings.Join([]string{
 		fmt.Sprintf("error: %s", c.err),
 		fmt.Sprintf("command: %q", c.command),
