@@ -57,8 +57,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if os.Args[1] == "help" {
-		if len(os.Args) == 2 {
+	if os.Args[1] == "help" || os.Args[1] == "--help" || os.Args[1] == "-h" {
+		if len(os.Args) == 2 || os.Args[1] == "--help" || os.Args[1] == "-h" {
+			fmt.Println("ds-to-dhall <command>")
+			fmt.Println("available commands:")
 			w := tabwriter.NewWriter(os.Stdout, 0, 8, 1, ' ', 0)
 
 			for cmdName := range cmds {
