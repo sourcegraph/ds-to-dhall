@@ -130,6 +130,7 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 
 		command := append([]string{bin}, args...)
 		return nil, &cmdErr{
+			err:     err,
 			command: strings.Join(command, " "),
 			stdOut:  outBuf.String(),
 			stdErr:  errBuf.String(),
@@ -150,10 +151,12 @@ type cmdErr struct {
 	command string
 	stdOut  string
 	stdErr  string
+	err     error
 }
 
 func (c *cmdErr) Error() string {
 	return strings.Join([]string{
+		fmt.Sprintf("error: %s", c.err),
 		fmt.Sprintf("command: %q", c.command),
 		fmt.Sprintf("standard out:\n%s", c.stdOut),
 		fmt.Sprintf("standard err:\n%s", c.stdErr),
