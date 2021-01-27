@@ -153,7 +153,6 @@ type cmdErr struct {
 }
 
 func (c *cmdErr) Error() string {
-
 	return strings.Join([]string{
 		fmt.Sprintf("command: %q", c.command),
 		fmt.Sprintf("standard out:\n%s", c.stdOut),
