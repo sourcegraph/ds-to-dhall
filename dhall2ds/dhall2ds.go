@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -98,6 +100,12 @@ func Main(args []string) {
 
 	componentTree, err := dhallToYAML(ctx, flagSet.Arg(0))
 	if err != nil {
+		if e, ok := err.(*commandError); ok {
+			// bypass log15 to have more control over what the error output looks like
+			// (newlines)
+			log.Fatalf("failed to execute dhall-to-yaml, err:\n%s", e)
+		}
+
 		logFatal("failed to execute dhall-to-yaml", "error", err)
 	}
 
@@ -114,16 +122,30 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 	spin.Start()
 	defer spin.Stop()
 
-	var ob bytes.Buffer
-	cmd := exec.CommandContext(ctx, "dhall-to-yaml", "--file", dhallFile)
-	cmd.Stdout = &ob
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+
+	bin := "dhall-to-yaml"
+	args := []string{"--file", dhallFile}
+
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
 
 	err := cmd.Run()
 	if err != nil {
-		return nil, err
+		return nil, &commandError{
+			err: err,
+
+			name: bin,
+			args: args,
+
+			stdOut: outBuf.String(),
+			stdErr: errBuf.String(),
+		}
 	}
 
-	decoder := yaml.NewDecoder(&ob)
+	decoder := yaml.NewDecoder(&outBuf)
 
 	var rv map[string]interface{}
 	err = decoder.Decode(&rv)
@@ -131,6 +153,27 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 		return nil, err
 	}
 	return rv, nil
+}
+
+type commandError struct {
+	err error
+
+	name string
+	args []string
+
+	stdOut string
+	stdErr string
+}
+
+func (c *commandError) Error() string {
+	command := strings.Join(append([]string{c.name}, c.args...), " ")
+
+	return strings.Join([]string{
+		fmt.Sprintf("error: %s", c.err),
+		fmt.Sprintf("command: %q", command),
+		fmt.Sprintf("standard output:\n%s", c.stdOut),
+		fmt.Sprintf("standard error:\n%s", c.stdErr),
+	}, "\n")
 }
 
 func exportYAML(contents map[string]interface{}, destinationPath string) error {
