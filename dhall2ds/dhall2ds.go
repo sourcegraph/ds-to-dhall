@@ -134,8 +134,8 @@ func dhallToYAML(ctx context.Context, dhallFile string) (map[string]interface{},
 
 	err := cmd.Run()
 	if err != nil {
-
 		command := append([]string{bin}, args...)
+
 		return nil, &cmdErr{
 			err:     err,
 			command: strings.Join(command, " "),
