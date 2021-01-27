@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -99,6 +100,12 @@ func Main(args []string) {
 
 	componentTree, err := dhallToYAML(ctx, flagSet.Arg(0))
 	if err != nil {
+		if e, ok := err.(*cmdErr); ok {
+			// bypass log15 to have more control over what the error output looks like
+			// (newlines)
+			log.Fatalf("failed to execute dhall-to-yaml, err:\n%s", e)
+		}
+
 		logFatal("failed to execute dhall-to-yaml", "error", err)
 	}
 
@@ -158,8 +165,8 @@ func (c *cmdErr) Error() string {
 	return strings.Join([]string{
 		fmt.Sprintf("error: %s", c.err),
 		fmt.Sprintf("command: %q", c.command),
-		fmt.Sprintf("standard out:\n%s", c.stdOut),
-		fmt.Sprintf("standard err:\n%s", c.stdErr),
+		fmt.Sprintf("standard output:\n%s", c.stdOut),
+		fmt.Sprintf("standard error:\n%s", c.stdErr),
 	}, "\n")
 }
 
