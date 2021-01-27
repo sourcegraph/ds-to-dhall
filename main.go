@@ -82,7 +82,7 @@ func main() {
 		cmd([]string{"-h"})
 	}
 
-	if os.Args[1] == "version" {
+	if os.Args[1] == "version" || os.Args[1] == "--version" || os.Args[1] == "-v" {
 		output := versionString(version, commit, date)
 		fmt.Fprintln(os.Stderr, output)
 		os.Exit(0)
