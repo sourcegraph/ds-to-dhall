@@ -131,7 +131,7 @@ const imageRecordTemplate = `let images =
   {{range $index, $imgRef := .}} {{if gt $index 0}},{{end}} {{$imgRef.Key}} = {
          registry = Some "{{$imgRef.Registry}}"
          , name = "{{$imgRef.Name}}"
-         , tag = Some "{{$imgRef.Version}}"
+         , tag = "{{$imgRef.Version}}"
          , digest = Some "{{$imgRef.Sha256}}"
       }
   {{end}}
