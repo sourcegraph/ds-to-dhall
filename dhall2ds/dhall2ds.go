@@ -182,7 +182,7 @@ func exportYAML(contents map[string]interface{}, destinationPath string) error {
 
 	yamlBytes, err := yaml.Marshal(contents)
 	if err != nil {
-		fmt.Errorf("when unmarshalling yaml: %w", err)
+		return fmt.Errorf("when unmarshalling yaml: %w", err)
 	}
 
 	r := bytes.NewReader(yamlBytes)
