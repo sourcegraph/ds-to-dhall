@@ -25,9 +25,10 @@ import (
 const ShortDescription = "exports a COMKIR Dhall record to a directory tree of YAML manifests"
 
 var (
-	destinationPath string
-	timeout         time.Duration
-	ignore          []string
+	destinationPath  string
+	timeout          time.Duration
+	ignore           []string
+	generatedComment bool
 
 	printHelp bool
 
@@ -56,6 +57,7 @@ func Main(args []string) {
 	flagSet.StringVarP(&destinationPath, "output", "o", "", "(required) path to a destination directory")
 	flagSet.DurationVar(&timeout, "timeout", 5*time.Minute, "length of time to run dhall command before timing out")
 	flagSet.StringArrayVarP(&ignore, "ignore", "i", nil, "omit output for resources matching one of the ignore COMKIR paths. specify path with '/' separator. uses gitignore semantics for matching")
+	flagSet.BoolVarP(&generatedComment, "generated-comment", "gc", false, "Include a comment header in the generated YAML warning not to edit the generated files")
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
@@ -177,8 +179,7 @@ func (c *commandError) Error() string {
 	}, "\n")
 }
 
-func exportYAML(contents map[string]interface{}, destinationPath string) error {
-
+func exportYAML(contents map[string]interface{}, destinationPath string, generatedComment bool) error {
 	yamlBytes, err := yaml.Marshal(contents)
 	if err != nil {
 		return fmt.Errorf("when unmarshalling yaml: %w", err)
@@ -186,10 +187,16 @@ func exportYAML(contents map[string]interface{}, destinationPath string) error {
 
 	r := bytes.NewReader(yamlBytes)
 
+	dhallToYAMLArgs := []string{}
+
+	if generatedComment {
+		dhallToYAMLArgs = append(dhallToYAMLArgs, "--generated-comment")
+	}
+
 	p := pipe.Line(
 		pipe.Read(r),
 		pipe.Exec("yaml-to-dhall"),
-		pipe.Exec("dhall-to-yaml"),
+		pipe.Exec("dhall-to-yaml", dhallToYAMLArgs...),
 		pipe.WriteFile(destinationPath, 0644),
 	)
 
@@ -199,7 +206,7 @@ func exportYAML(contents map[string]interface{}, destinationPath string) error {
 			err: err,
 
 			name: "yaml-to-dhall | dhall-to-yaml",
-			args: []string{destinationPath},
+			args: append(dhallToYAMLArgs, "--file", destinationPath),
 
 			stdOut: string(stdout),
 			stdErr: string(stderr),
@@ -254,9 +261,10 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 
 				r := resourceMap
 				p := outPath
+				gc := generatedComment
 
 				errs.Go(func() error {
-					err := exportYAML(r, p)
+					err := exportYAML(r, p, gc)
 					if err != nil {
 						return fmt.Errorf("failed to write YAML for %q, err: %w", p, err)
 					}
