@@ -49,6 +49,21 @@ jobs:
           CHECK: 'true'
         name: Check that dhall files are linted properly
         run: scripts/lint.sh
+  go-test:
+    name: go-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: 'actions/checkout@v2'
+      - name: '[setup] Install asdf'
+        uses: 'asdf-vm/actions/setup@v1.0.1'
+      - name: '[setup] Install asdf plugins'
+        run: './ci/asdf-add-plugins.sh'
+      - name: '[setup] Install asdf .tool-versions'
+        run: './ci/asdf-install.sh'
+      - name: '[setup] prepare go environment'
+        run: './ci/asdf-setup-go.sh'
+      - name: go-test
+        run: ci/go-test.sh
   golangci-lint:
     name: golangci-lint
     runs-on: ubuntu-latest
