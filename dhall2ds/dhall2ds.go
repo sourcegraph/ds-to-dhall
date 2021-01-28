@@ -217,6 +217,11 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 
 	errs := new(errgroup.Group)
 
+	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	spin.Prefix = fmt.Sprintf("Writing YAML to %q: ", destinationPath)
+	spin.Start()
+	defer spin.Stop()
+
 	for componentName, component := range componentTree {
 		componentMap, ok := component.(map[string]interface{})
 		if !ok {
