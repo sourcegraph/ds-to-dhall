@@ -57,7 +57,7 @@ func Main(args []string) {
 	flagSet.StringVarP(&destinationPath, "output", "o", "", "(required) path to a destination directory")
 	flagSet.DurationVar(&timeout, "timeout", 5*time.Minute, "length of time to run dhall command before timing out")
 	flagSet.StringArrayVarP(&ignore, "ignore", "i", nil, "omit output for resources matching one of the ignore COMKIR paths. specify path with '/' separator. uses gitignore semantics for matching")
-	flagSet.BoolVarP(&generatedComment, "generated-comment", "gc", false, "Include a comment header in the generated YAML warning not to edit the generated files")
+	flagSet.BoolVar(&generatedComment, "generated-comment", false, "Include a comment header in the generated YAML warning not to edit the generated files")
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
