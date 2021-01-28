@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -208,8 +207,7 @@ func exportYAML(contents map[string]interface{}, destinationPath string) error {
 		return fmt.Errorf("when running yaml-to-dhall | dhall-to-yaml pipeline %w", e)
 	}
 
-	return ioutil.WriteFile(destinationPath, stdout, 0644)
-
+	return nil
 }
 
 func exportComponents(componentTree map[string]interface{}, destinationPath string, ignore []string) error {
