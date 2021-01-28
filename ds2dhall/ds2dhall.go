@@ -434,6 +434,8 @@ func loadResourceSet(inputs []string, kind2type map[string]string) (*comkir.Reso
 	rs.Root = cr
 	gitIgnoreMatcher := gitignore.CompileIgnoreLines(ignoreFiles...)
 
+	numResources := 0
+
 	for _, input := range pas {
 		err = filepath.Walk(input, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -457,6 +459,7 @@ func loadResourceSet(inputs []string, kind2type map[string]string) (*comkir.Reso
 					return err
 				}
 				rs.Components[res.Component] = append(rs.Components[res.Component], res)
+				numResources++
 			}
 			return nil
 		})
@@ -464,6 +467,8 @@ func loadResourceSet(inputs []string, kind2type map[string]string) (*comkir.Reso
 			return nil, err
 		}
 	}
+
+	log15.Info("loaded resources", "num", numResources)
 
 	return &rs, nil
 }
