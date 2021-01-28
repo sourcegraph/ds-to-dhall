@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -33,7 +34,7 @@ var (
 	componentsFile  string
 	timeout         time.Duration
 	ignoreFiles     []string
-	schemaURL       string
+	k8sURL          string
 
 	printHelp bool
 
@@ -52,8 +53,8 @@ func Main(args []string) {
 	flagSet.StringVarP(&componentsFile, "components", "c", "", "components yaml output file")
 	flagSet.DurationVar(&timeout, "timeout", 5*time.Minute, "length of time to run yaml-to-dhall command before timing out")
 	flagSet.StringArrayVarP(&ignoreFiles, "ignore", "i", nil, "input files matching these gitignore patterns will be ignored")
-	flagSet.StringVarP(&schemaURL, "k8sSchemaURL", "u",
-		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18/schemas.dhall", "URL to k8s schemas.dhall file")
+	flagSet.StringVarP(&k8sURL, "k8sURL", "u",
+		"https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/1.18", "URL to k8s Dhall")
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
 
 	flagSet.Usage = func() {
@@ -85,8 +86,14 @@ func Main(args []string) {
 		inputs = []string{cwd}
 	}
 
+	log15.Info("building kind to k8s type mapping", "k8sURL", k8sURL)
+	kind2Type, err := buildKind2TypeMapping(k8sURL + "/types.dhall")
+	if err != nil {
+		logFatal("failed to build kind to k8s type mapping", "error", err, "k8sURL", k8sURL)
+	}
+
 	log15.Info("loading resources", "inputs", inputs)
-	srcSet, err := loadResourceSet(inputs)
+	srcSet, err := loadResourceSet(inputs, kind2Type)
 	if err != nil {
 		logFatal("failed to load source resources", "error", err, "inputs", inputs)
 	}
@@ -210,7 +217,45 @@ func Main(args []string) {
 	log15.Info("done")
 }
 
-func loadResource(rootDir string, filename string) (*comkir.Resource, error) {
+func loadHttpContents(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(resp.Body)
+}
+
+func buildKind2TypeMapping(url string) (map[string]string, error) {
+	var typesBytes []byte
+
+	if strings.HasPrefix(url, "http") {
+		contents, err := loadHttpContents(url)
+		if err != nil {
+			return nil, err
+		}
+		typesBytes = contents
+	} else {
+		contents, err := ioutil.ReadFile(url)
+		if err != nil {
+			return nil, err
+		}
+		typesBytes = contents
+	}
+
+	return parseTypes(typesBytes)
+}
+
+func typeRefFromKind(kind string, kind2type map[string]string) string {
+	dt := kind2type[kind]
+	if strings.HasPrefix(dt, ".") {
+		return k8sURL + dt[1:]
+	}
+	return dt
+}
+
+func loadResource(rootDir string, filename string, kind2type map[string]string) (*comkir.Resource, error) {
 	relPath, err := filepath.Rel(rootDir, filename)
 	if err != nil {
 		return nil, err
@@ -243,7 +288,7 @@ func loadResource(rootDir string, filename string) (*comkir.Resource, error) {
 	}
 	res.ApiVersion = apiVersion
 
-	res.DhallType = fmt.Sprintf("(%s).%s.Type", schemaURL, res.Kind)
+	res.DhallType = typeRefFromKind(res.Kind, kind2type)
 
 	metadata, ok := res.Contents["metadata"].(map[string]interface{})
 	if !ok {
@@ -375,7 +420,7 @@ func commonPrefix(paths []string) (string, error) {
 	return strings.Join(cp, string(os.PathSeparator)), nil
 }
 
-func loadResourceSet(inputs []string) (*comkir.ResourceSet, error) {
+func loadResourceSet(inputs []string, kind2type map[string]string) (*comkir.ResourceSet, error) {
 	pas, err := makeAbs(inputs)
 	if err != nil {
 		return nil, err
@@ -407,7 +452,7 @@ func loadResourceSet(inputs []string) (*comkir.ResourceSet, error) {
 			}
 
 			if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
-				res, err := loadResource(rs.Root, path)
+				res, err := loadResource(rs.Root, path, kind2type)
 				if err != nil {
 					return err
 				}
