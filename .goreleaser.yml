@@ -13,6 +13,12 @@ brews:
     folder: Formula
     homepage: https://github.com/sourcegraph/ds-to-dhall
     description: CLI to translate deploy-sourcegraph YAML to Dhall
+    dependencies:
+      - name: dhall
+      - name: dhall-json
+      - name: dhall-yaml
+      - name: dhall-bash
+      - name: dhall-lsp-server
     test: |
       system "#{bin}/ds-to-dhall --help"
 builds:
