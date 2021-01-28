@@ -16,11 +16,14 @@ let golangci-lint = ./jobs/golangci-lint.dhall
 
 let goreleaser = ./jobs/goreleaser.dhall
 
+let go-test = ./jobs/go-test.dhall
+
 in  GitHubActions.Workflow::{
     , name = "CI"
     , on = GitHubActions.On::{ push = Some GitHubActions.Push::{=} }
     , jobs = toMap
         { shellcheck
+        , go-test
         , shfmt
         , dhallFormat
         , dhallLint
