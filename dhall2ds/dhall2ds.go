@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -25,10 +24,11 @@ import (
 const ShortDescription = "exports a COMKIR Dhall record to a directory tree of YAML manifests"
 
 var (
-	destinationPath  string
-	timeout          time.Duration
-	ignore           []string
-	generatedComment bool
+	destinationPath          string
+	timeout                  time.Duration
+	ignore                   []string
+	generatedComment         bool
+	numConcurrentYAMLExports int
 
 	printHelp bool
 
@@ -51,7 +51,7 @@ func usageArgs() string {
 	return fmt.Sprintf("ARGS:\n%s", b.String())
 }
 
-func Main(args []string) {
+func Main(args []string, mainCtx context.Context) {
 	flagSet = flag.NewFlagSet("dhall2ds", flag.ExitOnError)
 
 	flagSet.StringVarP(&destinationPath, "output", "o", "", "(required) path to a destination directory")
@@ -59,6 +59,7 @@ func Main(args []string) {
 	flagSet.StringArrayVarP(&ignore, "ignore", "i", nil, "omit output for resources matching one of the ignore COMKIR paths. specify path with '/' separator. uses gitignore semantics for matching")
 	flagSet.BoolVar(&generatedComment, "generated-comment", false, "Include a comment header in the generated YAML warning not to edit the generated files")
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")
+	flagSet.IntVar(&numConcurrentYAMLExports, "numSimultaneousExports", 5, "how many simultaneous exports can happen")
 
 	flagSet.Usage = func() {
 		fmt.Fprintf(os.Stderr, "dhall2ds %s\n", ShortDescription)
@@ -85,20 +86,7 @@ func Main(args []string) {
 		logFatal("cannot create output directory", "err", err, "output dir", destinationPath)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-c:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	ctx, cancel := context.WithTimeout(mainCtx, timeout)
 	defer cancel()
 
 	componentTree, err := dhallToYAML(ctx, flagSet.Arg(0))
@@ -227,6 +215,8 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 	spin.Start()
 	defer spin.Stop()
 
+	sem := make(chan struct{}, numConcurrentYAMLExports)
+
 	for componentName, component := range componentTree {
 		componentMap, ok := component.(map[string]interface{})
 		if !ok {
@@ -263,7 +253,11 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 				p := outPath
 				gc := generatedComment
 
+				sem <- struct{}{}
 				errs.Go(func() error {
+					defer func() {
+						<-sem
+					}()
 					err := exportYAML(r, p, gc)
 					if err != nil {
 						return fmt.Errorf("failed to write YAML for %q, err: %w", p, err)
