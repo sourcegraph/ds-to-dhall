@@ -2,9 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 
 	"ds-to-dhall/dhall2ds"
@@ -34,7 +37,7 @@ func versionString(version, commit, date string) string {
 }
 
 func main() {
-	cmds := make(map[string]func([]string))
+	cmds := make(map[string]func([]string, context.Context))
 	shortDescriptions := make(map[string]string)
 	cmds["ds2dhall"] = ds2dhall.Main
 	shortDescriptions["ds2dhall"] = ds2dhall.ShortDescription
@@ -79,7 +82,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		cmd([]string{"-h"})
+		cmd([]string{"-h"}, context.Background())
 	}
 
 	if os.Args[1] == "version" || os.Args[1] == "--version" || os.Args[1] == "-v" {
@@ -95,5 +98,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	cmd(os.Args[2:])
+	ctx, cancel := context.WithCancel(context.Background())
+	shutdown := func() {
+		cancel()
+	}
+	defer shutdown()
+
+	go trapSignalsForShutdown(shutdown)
+
+	cmd(os.Args[2:], ctx)
+}
+
+func trapSignalsForShutdown(shutdown func()) {
+	// Listen for shutdown signals. When we receive one attempt to clean up,
+	// but do an insta-shutdown if we receive more than one signal.
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGHUP)
+	<-c
+	go func() {
+		<-c
+		os.Exit(0)
+	}()
+
+	shutdown()
 }

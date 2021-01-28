@@ -3,6 +3,7 @@ package dockerimg
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -141,7 +142,7 @@ in images
 
 var tmpl = template.Must(template.New("imageRecordDhall").Parse(imageRecordTemplate))
 
-func Main(args []string) {
+func Main(args []string, _ context.Context) {
 	flagSet = flag.NewFlagSet("dockerimg", flag.ExitOnError)
 
 	flagSet.BoolVarP(&printHelp, "help", "h", false, "print usage instructions")

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -43,7 +42,7 @@ var (
 
 const ShortDescription = "imports a deploy-sourcegraph/base into a COMKIR Dhall record"
 
-func Main(args []string) {
+func Main(args []string, mainCtx context.Context) {
 	flagSet = flag.NewFlagSet("ds2dhall", flag.ExitOnError)
 
 	flagSet.StringVarP(&destinationFile, "output", "o", "", "(required) dhall output file")
@@ -140,20 +139,7 @@ func Main(args []string) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-c:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	ctx, cancel := context.WithTimeout(mainCtx, timeout)
 	defer cancel()
 
 	err = yamlToDhall(ctx, dhallType, yamlBytes, destinationFile)
