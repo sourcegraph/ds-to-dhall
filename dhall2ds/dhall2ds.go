@@ -267,5 +267,4 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 	}
 
 	return errs.Wait()
-
 }
