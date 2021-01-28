@@ -1,10 +1,10 @@
 package dhall2ds
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -18,6 +18,8 @@ import (
 	"github.com/inconshreveable/log15"
 	gitignore "github.com/sabhiram/go-gitignore"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/sync/errgroup"
+	"gopkg.in/pipe.v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -177,21 +179,43 @@ func (c *commandError) Error() string {
 }
 
 func exportYAML(contents map[string]interface{}, destinationPath string) error {
-	f, err := os.Create(destinationPath)
+
+	yamlBytes, err := yaml.Marshal(contents)
 	if err != nil {
-		return err
+		fmt.Errorf("when unmarshalling yaml: %w", err)
 	}
-	defer f.Close()
 
-	br := bufio.NewWriter(f)
-	defer br.Flush()
+	r := bytes.NewReader(yamlBytes)
 
-	encoder := yaml.NewEncoder(br)
-	return encoder.Encode(contents)
+	p := pipe.Line(
+		pipe.Read(r),
+		pipe.Exec("yaml-to-dhall"),
+		pipe.Exec("dhall-to-yaml"),
+		pipe.WriteFile(destinationPath, 0644),
+	)
+
+	stdout, stderr, err := pipe.DividedOutput(p)
+	if err != nil {
+		e := &commandError{
+			err: err,
+
+			name: "yaml-to-dhall | dhall-to-yaml",
+			args: []string{destinationPath},
+
+			stdOut: string(stdout),
+			stdErr: string(stderr),
+		}
+		return fmt.Errorf("when running yaml-to-dhall | dhall-to-yaml pipeline %w", e)
+	}
+
+	return ioutil.WriteFile(destinationPath, stdout, 0644)
+
 }
 
 func exportComponents(componentTree map[string]interface{}, destinationPath string, ignore []string) error {
 	gitIgnoreMatcher := gitignore.CompileIgnoreLines(ignore...)
+
+	errs := new(errgroup.Group)
 
 	for componentName, component := range componentTree {
 		componentMap, ok := component.(map[string]interface{})
@@ -225,12 +249,20 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 				outPath := filepath.Join(dirPath, fmt.Sprintf("%s.%s.%s.yaml",
 					componentName, kindName, resourceName))
 
-				err = exportYAML(resourceMap, outPath)
-				if err != nil {
-					return err
-				}
+				r := resourceMap
+				p := outPath
+
+				errs.Go(func() error {
+					err := exportYAML(r, p)
+					if err != nil {
+						return fmt.Errorf("failed to write YAML for %q, err: %w", p, err)
+					}
+					return nil
+				})
 			}
 		}
 	}
-	return nil
+
+	return errs.Wait()
+
 }
