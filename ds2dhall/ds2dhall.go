@@ -304,50 +304,9 @@ func loadResource(rootDir string, filename string, kind2type map[string]string) 
 		}
 	}
 
-	if res.Kind == "StatefulSet" {
-		// patch statefulsets
-		spec, ok := res.Contents["spec"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("resource %s is missing spec section", filename)
-		}
-		volumeClaimTemplates, ok := spec["volumeClaimTemplates"].([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("resource %s is missing volumeClaimTemplates section", filename)
-		}
-		for _, volumeClaimTemplate := range volumeClaimTemplates {
-			vct, ok := volumeClaimTemplate.(map[string]interface{})
-			if !ok {
-				return nil, fmt.Errorf("resource %s is missing volumeClaimTemplate section", filename)
-			}
-			vct["apiVersion"] = "v1"
-			vct["kind"] = "PersistentVolumeClaim"
-		}
-	} else if res.Kind == "CronJob" {
-		// patch cronjob
-		spec, ok := res.Contents["spec"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("resource %s is missing spec section", filename)
-		}
-		jobTemplateSpec, ok := spec["jobTemplate"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("resource %s is missing jobTemplate section", filename)
-		}
-
-		_, ok = jobTemplateSpec["metadata"].(map[string]interface{})
-		if !ok {
-			jobTemplateSpec["metadata"] = make(map[string]interface{})
-		}
-	} else if res.Kind == "PersistentVolume" {
-		// patch persistentvolume
-		spec, ok := res.Contents["spec"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("resource %s is missing spec section", filename)
-		}
-		claimRef, ok := spec["claimRef"].(map[string]interface{})
-		if ok {
-			claimRef["apiVersion"] = "v1"
-			claimRef["kind"] = "PersistentVolumeClaim"
-		}
+	err = patchResource(&res, filename)
+	if err != nil {
+		return nil, err
 	}
 
 	return &res, err
