@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,7 +99,6 @@ func processReader(ir io.Reader, imgRefs *[]*ImageReference, seen map[string]str
 		r, err := Parse(line)
 		if err != nil {
 			// silently skip over any parse errors (for instance - the line isn't something that contains a docker reference)
-			log.Println(err)
 			continue
 		}
 
