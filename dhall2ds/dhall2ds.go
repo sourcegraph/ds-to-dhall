@@ -100,7 +100,7 @@ func Main(args []string, mainCtx context.Context) {
 		logFatal("failed to execute dhall-to-yaml", "error", err)
 	}
 
-	err = exportComponents(componentTree, destinationPath, ignore)
+	err = exportComponents(mainCtx, componentTree, destinationPath, ignore)
 
 	if err != nil {
 		logFatal("failed to export", "err", err)
@@ -167,7 +167,7 @@ func (c *commandError) Error() string {
 	}, "\n")
 }
 
-func exportYAML(contents map[string]interface{}, destinationPath string, generatedComment bool) error {
+func exportYAML(_ context.Context, contents map[string]interface{}, destinationPath string, generatedComment bool) error {
 	yamlBytes, err := yaml.Marshal(contents)
 	if err != nil {
 		return fmt.Errorf("when unmarshalling yaml: %w", err)
@@ -181,6 +181,7 @@ func exportYAML(contents map[string]interface{}, destinationPath string, generat
 		dhallToYAMLArgs = append(dhallToYAMLArgs, "--generated-comment")
 	}
 
+	// TODO(uwe): find a way to pass in the calling context to this pipe (make it cancellable and clean up)
 	p := pipe.Line(
 		pipe.Read(r),
 		pipe.Exec("yaml-to-dhall"),
@@ -205,10 +206,10 @@ func exportYAML(contents map[string]interface{}, destinationPath string, generat
 	return nil
 }
 
-func exportComponents(componentTree map[string]interface{}, destinationPath string, ignore []string) error {
+func exportComponents(ctx context.Context, componentTree map[string]interface{}, destinationPath string, ignore []string) error {
 	gitIgnoreMatcher := gitignore.CompileIgnoreLines(ignore...)
 
-	errs := new(errgroup.Group)
+	errs, ctx := errgroup.WithContext(ctx)
 
 	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 	spin.Prefix = fmt.Sprintf("Writing YAML to %q: ", destinationPath)
@@ -230,6 +231,11 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 			}
 
 			for resourceName, resource := range kindMap {
+				// check if we're cancelled and can bail early
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+
 				if gitIgnoreMatcher.MatchesPath(filepath.Join(componentName, kindName, resourceName)) {
 					continue
 				}
@@ -258,7 +264,7 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 					defer func() {
 						<-sem
 					}()
-					err := exportYAML(r, p, gc)
+					err := exportYAML(ctx, r, p, gc)
 					if err != nil {
 						return fmt.Errorf("failed to write YAML for %q, err: %w", p, err)
 					}
@@ -266,6 +272,10 @@ func exportComponents(componentTree map[string]interface{}, destinationPath stri
 				})
 			}
 		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	return errs.Wait()
