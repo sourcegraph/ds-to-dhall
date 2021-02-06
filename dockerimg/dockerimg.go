@@ -56,6 +56,10 @@ func (ir *ImageReference) FormatDigest() string {
 	return ir.formatOptionalText(ir.Sha256)
 }
 
+func (ir *ImageReference) FormatKey() string {
+	return fmt.Sprintf("`%s`", ir.Key)
+}
+
 func (ir *ImageReference) formatOptionalText(s string) string {
 	if s == "" {
 		return "None Text"
@@ -180,7 +184,7 @@ func processInputs(inputs []string, imgRefs *[]*ImageReference, seen map[string]
 
 const imageRecordTemplate = `let images =
 {
-  {{range $index, $imgRef := .}} {{if gt $index 0}},{{end}} {{$imgRef.Key}} = {
+  {{range $index, $imgRef := .}} {{if gt $index 0}},{{end}} {{$imgRef.FormatKey}} = {
          registry = {{$imgRef.FormatRegistry}}
          , name = "{{$imgRef.Name}}"
          , tag = "{{$imgRef.Version}}"
