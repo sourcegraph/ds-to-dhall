@@ -49,11 +49,19 @@ type ImageReference struct {
 }
 
 func (ir *ImageReference) FormatRegistry() string {
-	if ir.Registry == "" {
+	return ir.formatOptionalText(ir.Registry)
+}
+
+func (ir *ImageReference) FormatDigest() string {
+	return ir.formatOptionalText(ir.Sha256)
+}
+
+func (ir *ImageReference) formatOptionalText(s string) string {
+	if s == "" {
 		return "None Text"
 	}
 
-	return fmt.Sprintf("Some %q", ir.Registry)
+	return fmt.Sprintf("Some %q", s)
 }
 
 // copied from https://github.com/retrohacker/parse-docker-image-name/blob/1d43ab3bde106d77374530b1d982d47375742672/index.js#L3
@@ -176,7 +184,7 @@ const imageRecordTemplate = `let images =
          registry = {{$imgRef.FormatRegistry}}
          , name = "{{$imgRef.Name}}"
          , tag = "{{$imgRef.Version}}"
-         , digest = Some "{{$imgRef.Sha256}}"
+         , digest = {{$imgRef.FormatDigest}}
       }
   {{end}}
 }
