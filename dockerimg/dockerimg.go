@@ -48,43 +48,94 @@ type ImageReference struct {
 	Key      string
 }
 
+func (ir *ImageReference) FormatRegistry() string {
+	return ir.formatOptionalText(ir.Registry)
+}
+
+func (ir *ImageReference) FormatDigest() string {
+	return ir.formatOptionalText(ir.Sha256)
+}
+
+func (ir *ImageReference) formatOptionalText(s string) string {
+	if s == "" {
+		return "None Text"
+	}
+
+	return fmt.Sprintf("Some %q", s)
+}
+
+// copied from https://github.com/retrohacker/parse-docker-image-name/blob/1d43ab3bde106d77374530b1d982d47375742672/index.js#L3
+var (
+	hasPort     = match(":[0-9]+")
+	hasDot      = match("\\.")
+	isLocalhost = match("^localhost(:[0-9]+)?$")
+)
+
+func domainIsNotHostName(s string) bool {
+	return s != "" && !hasPort.MatchString(s) && !hasDot.MatchString(s) && !isLocalhost.MatchString(s)
+}
+
 func processReader(ir io.Reader, imgRefs *[]*ImageReference, seen map[string]struct{}) error {
 	contents, err := ioutil.ReadAll(ir)
 	if err != nil {
 		return err
 	}
 
-	matches := NotAnchoredReferenceRegexp.FindAllStringSubmatch(string(contents), -1)
+	for _, line := range strings.Split(string(contents), "\n") {
+		line = strings.TrimSpace(line)
+		line = strings.TrimPrefix(line, "image:")
+		line = strings.TrimSpace(line)
 
-	for _, match := range matches {
-		if len(match) != 4 {
+		if line == "" {
+			continue
+		}
+
+		r, err := Parse(line)
+		if err != nil {
+			// silently skip over any parse errors (for instance - the line isn't something that contains a docker reference)
 			continue
 		}
 
 		imgRef := &ImageReference{}
-
-		if strings.HasPrefix(match[3], "sha256:") {
-			nameParts := strings.Split(match[1], "/")
-			if len(nameParts) > 1 {
-				imgRef.Registry = nameParts[0]
-				imgRef.Name = strings.Join(nameParts[1:], "/")
-			} else {
-				imgRef.Name = match[1]
-			}
-			imgRef.Version = match[2]
-			imgRef.Sha256 = strings.TrimPrefix(match[3], "sha256:")
-
-			if strings.HasPrefix(imgRef.Name, "sourcegraph/") {
-				imgRef.Key =
-					strings.Replace(strings.TrimPrefix(imgRef.Name, "sourcegraph/"), ".", "_", -1)
-
-				if _, ok := seen[imgRef.Key]; !ok {
-					*imgRefs = append(*imgRefs, imgRef)
-					seen[imgRef.Key] = struct{}{}
-				}
-			}
+		named, ok := r.(Named)
+		if !ok {
+			// must have a name at least
+			continue
 		}
+
+		tagged, ok := r.(Tagged)
+		if !ok {
+			// must have a tag at least
+			continue
+		}
+
+		path := Path(named)
+
+		imgRef.Name = path
+
+		d := Domain(named)
+		imgRef.Registry = d
+
+		if domainIsNotHostName(d) {
+			imgRef.Name = fmt.Sprintf("%s/%s", d, path)
+			imgRef.Registry = ""
+		}
+
+		imgRef.Key = imgRef.Name
+
+		imgRef.Version = tagged.Tag()
+
+		if digested, ok := r.(Digested); ok {
+			imgRef.Sha256 = strings.TrimPrefix(digested.Digest().String(), "sha256:")
+		}
+
+		if _, ok := seen[imgRef.Key]; !ok {
+			*imgRefs = append(*imgRefs, imgRef)
+			seen[imgRef.Key] = struct{}{}
+		}
+
 	}
+
 	return nil
 }
 
@@ -130,10 +181,10 @@ func processInputs(inputs []string, imgRefs *[]*ImageReference, seen map[string]
 const imageRecordTemplate = `let images =
 {
   {{range $index, $imgRef := .}} {{if gt $index 0}},{{end}} {{$imgRef.Key}} = {
-         registry = Some "{{$imgRef.Registry}}"
+         registry = {{$imgRef.FormatRegistry}}
          , name = "{{$imgRef.Name}}"
          , tag = "{{$imgRef.Version}}"
-         , digest = Some "{{$imgRef.Sha256}}"
+         , digest = {{$imgRef.FormatDigest}}
       }
   {{end}}
 }
