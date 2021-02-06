@@ -1,5 +1,7 @@
 package dockerimg
 
+// Copied from https://github.com/distribution/distribution/tree/32c77af6ac94ba4e34fc9aaa784c6ca69c114cf0/reference
+
 import "regexp"
 
 var (

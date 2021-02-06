@@ -1,3 +1,5 @@
+// Copied from https://github.com/distribution/distribution/tree/32c77af6ac94ba4e34fc9aaa784c6ca69c114cf0/reference
+
 // Package reference provides a general type to represent any way of referencing images within the registry.
 // Its main purpose is to abstract tags and digests (content-addressable hash).
 //
