@@ -1,7 +1,5 @@
 package dockerimg
 
-// verbatim copy of https://github.com/docker/distribution/blob/master/reference/regexp.go
-
 import "regexp"
 
 var (
@@ -11,7 +9,11 @@ var (
 
 	// separatorRegexp defines the separators allowed to be embedded in name
 	// components. This allow one period, one or two underscore and multiple
-	// dashes.
+	// dashes. Repeated dashes and underscores are intentionally treated
+	// differently. In order to support valid hostnames as name components,
+	// supporting repeated dash was added. Additionally double underscore is
+	// now allowed as a separator to loosen the restriction for previously
+	// supported names.
 	separatorRegexp = match(`(?:[._]|__|[-]*)`)
 
 	// nameComponentRegexp restricts registry path component names to start
@@ -38,8 +40,16 @@ var (
 	// TagRegexp matches valid tag names. From docker/docker:graph/tags.go.
 	TagRegexp = match(`[\w][\w.-]{0,127}`)
 
+	// anchoredTagRegexp matches valid tag names, anchored at the start and
+	// end of the matched string.
+	anchoredTagRegexp = anchored(TagRegexp)
+
 	// DigestRegexp matches valid digests.
 	DigestRegexp = match(`[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`)
+
+	// anchoredDigestRegexp matches valid digests, anchored at the start and
+	// end of the matched string.
+	anchoredDigestRegexp = anchored(DigestRegexp)
 
 	// NameRegexp is the format for the name component of references. The
 	// regexp has capturing groups for the domain and name part omitting
@@ -49,9 +59,42 @@ var (
 		nameComponentRegexp,
 		optional(repeated(literal(`/`), nameComponentRegexp)))
 
+	// anchoredNameRegexp is used to parse a name value, capturing the
+	// domain and trailing components.
+	anchoredNameRegexp = anchored(
+		optional(capture(DomainRegexp), literal(`/`)),
+		capture(nameComponentRegexp,
+			optional(repeated(literal(`/`), nameComponentRegexp))))
+
+	// ReferenceRegexp is the full supported format of a reference. The regexp
+	// is anchored and has capturing groups for name, tag, and digest
+	// components.
+	ReferenceRegexp = anchored(capture(NameRegexp),
+		optional(literal(":"), capture(TagRegexp)),
+		optional(literal("@"), capture(DigestRegexp)))
+
 	NotAnchoredReferenceRegexp = expression(capture(NameRegexp),
 		optional(literal(":"), capture(TagRegexp)),
 		optional(literal("@"), capture(DigestRegexp)))
+
+	// IdentifierRegexp is the format for string identifier used as a
+	// content addressable identifier using sha256. These identifiers
+	// are like digests without the algorithm, since sha256 is used.
+	IdentifierRegexp = match(`([a-f0-9]{64})`)
+
+	// ShortIdentifierRegexp is the format used to represent a prefix
+	// of an identifier. A prefix may be used to match a sha256 identifier
+	// within a list of trusted identifiers.
+	ShortIdentifierRegexp = match(`([a-f0-9]{6,64})`)
+
+	// anchoredIdentifierRegexp is used to check or match an
+	// identifier value, anchored at start and end of string.
+	anchoredIdentifierRegexp = anchored(IdentifierRegexp)
+
+	// anchoredShortIdentifierRegexp is used to check if a value
+	// is a possible identifier prefix, anchored at start and end
+	// of string.
+	anchoredShortIdentifierRegexp = anchored(ShortIdentifierRegexp)
 )
 
 // match compiles the string to a regular expression.
@@ -100,4 +143,9 @@ func group(res ...*regexp.Regexp) *regexp.Regexp {
 // capture wraps the expression in a capturing group.
 func capture(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(`(` + expression(res...).String() + `)`)
+}
+
+// anchored anchors the regular expression by adding start and end delimiters.
+func anchored(res ...*regexp.Regexp) *regexp.Regexp {
+	return match(`^` + expression(res...).String() + `$`)
 }
